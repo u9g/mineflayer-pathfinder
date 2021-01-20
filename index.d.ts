@@ -21,7 +21,7 @@ declare module 'mineflayer-pathfinder' {
 		): ComputedPath;
 		setGoal(goal: goals.Goal, dynamic?: boolean): void;
 		setMovements(movements: Movements): void;
-		goto(goal: goals.Goal, callback: Callback): void;
+		goto(goal: goals.Goal): Promise<void>
 
 		isMoving(): boolean;
 		isMining(): boolean;
