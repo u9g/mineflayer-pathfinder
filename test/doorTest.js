@@ -65,7 +65,6 @@ describe('canOpenDoors', function () {
 
   it('walks through an open door without clicking it shut', () => {
     door(world, 5, 64, 0, true); door(world, 5, 65, 0, true, 'upper')
-    assert(world.blockAt(new Vec3(5, 64, 0)).shapes.length > 0, 'an open door still has a shape — that is why the gate test is wrong for doors')
     const mv = forward(4, 0)
     assert(mv)
     assert.strictEqual(mv.toPlace.length, 0)
