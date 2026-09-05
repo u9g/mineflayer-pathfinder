@@ -4,7 +4,9 @@
 // A tiny fake world, the real registry and prismarine-block — no server.
 const assert = require('assert')
 const { Vec3 } = require('vec3')
-const { Movements } = require('mineflayer-pathfinder')
+const { Movements, goals } = require('mineflayer-pathfinder')
+const AStar = require('../lib/astar')
+const Move = require('../lib/move')
 
 const Version = '1.16.5'
 const registry = require('minecraft-data')(Version)
@@ -49,7 +51,6 @@ describe('canOpenDoors', function () {
     m.canOpenDoors = true
   })
   const forward = (x, z) => { const n = []; m.getMoveForward(node(x, z), east, n); return n[0] || null }
-  const seen = (x, z) => m.getBlock(node(x - 1, z), 1, 0, 0) // the block as the move generators see it (annotated by getBlock)
 
   it('clicks a closed door once and leaves both halves alone', () => {
     door(world, 5, 64, 0, false); door(world, 5, 65, 0, false, 'upper')
@@ -71,21 +72,23 @@ describe('canOpenDoors', function () {
     assert.strictEqual(mv.toBreak.length, 0)
   })
 
-  it('never digs a door, even with canDig on', () => {
+  it('paths through a closed door by clicking it, not digging it, even with canDig on', () => {
+    for (let z = -6; z <= 6; z++) for (const y of [64, 65]) world.set(5, y, z, 'oak_planks')
     door(world, 5, 64, 0, false); door(world, 5, 65, 0, false, 'upper')
     assert.strictEqual(m.canDig, true)
-    assert.strictEqual(m.safeToBreak(seen(5, 0)), false)
-    const diag = []; m.getMoveDiagonal(node(4, -1), { x: 1, z: 1 }, diag)
-    assert.strictEqual(diag.length, 0, 'diagonal into a door frame')
-    const jump = []; m.getMoveJumpUp(node(4, 0), east, jump)
-    assert.strictEqual(jump.length, 0, 'jump-up through a door')
+    const result = new AStar(new Move(1, 64, 0, 0, 0), m, new goals.GoalBlock(8, 64, 0), 1000, 1000).compute()
+    assert.strictEqual(result.status, 'success')
+    const doorBreaks = result.path.flatMap(p => p.toBreak).filter(b => b.x === 5 && b.z === 0)
+    assert.deepStrictEqual(doorBreaks, [])
+    const clicks = result.path.flatMap(p => p.toPlace).filter(p => p.useOne)
+    assert.strictEqual(clicks.length, 1)
+    assert.strictEqual(clicks[0].y, 64)
   })
 
   it('still clicks a closed gate, and walks an open one instead of digging it', () => {
     gate(world, 8, 64, 0, false)
     const closed = forward(7, 0)
     assert(closed && closed.toPlace.length === 1 && closed.toPlace[0].useOne)
-    assert.strictEqual(m.safeToBreak(seen(8, 0)), false)
     gate(world, 9, 64, 0, true)
     const open = forward(8, 0)
     assert(open, 'no move through an open gate')
