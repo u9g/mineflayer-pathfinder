@@ -143,6 +143,49 @@ How many milliseconds per tick are allocated to thinking.
 The search limiting radius, in blocks, if `-1` the search is not limited by distance.
  * `Default` - `-1`
 
+# Human-like walking
+
+`createHuman(bot, options)` returns a controller that walks routes the way a player does. The pathfinder only plans the route; the controller then follows it by pure pursuit (corners become curves, the bot never snaps to block centres), turns the head in discrete mouse-like gestures on the 0.15° sensitivity grid, starts sprinting and sprint-jumping with human delays and rates, and coasts to a stop at the goal instead of braking on it. Reaction time, base pitch, glances and strafing are per-bot personality traits drawn from a seed. It walks, steps up single blocks and drops down; it does not dig, place, swim or parkour.
+
+```js
+const { createHuman } = require('mineflayer-pathfinder')
+
+const human = createHuman(bot, { seed: 42 })
+await human.walkTo(new Vec3(10.5, 64, -20.5), { faceAt: npc.position.offset(0, 1.62, 0) })
+```
+
+### createHuman(bot, options)
+ * `bot` - the bot; the pathfinder plugin is loaded if it is not yet
+ * `options` - optional:
+   * `seed` - number; the same seed reproduces the same personality and noise
+   * `personality` - overrides for any trait listed under `human.personality`
+   * `movements` - Movements instance used for planning (default: a walking-only instance that does not dig, place, tower or parkour)
+   * `thinkTimeout` - planning timeout in ms (default: `bot.pathfinder.thinkTimeout`)
+ * `Returns` - a `Human`
+
+### human.walkTo(goal, options)
+Walks to `goal` (a Vec3 at feet level) and returns a Promise that resolves once the bot has come to a stop there. Rejects with `no path`, `stuck`, `walk timed out`, `superseded` (a newer `walkTo` was issued) or `stopped`.
+ * `options` - optional:
+   * `radius` - stop within this distance of the goal (default: the personality's `stopRadius`)
+   * `timeout` - ms (default `60000`)
+   * `faceAt` - Vec3 to look at once arrived (an entity's eyes, a block); the Promise resolves after the look settles
+
+### human.lookAt(point, options)
+Turns the head to `point` after a reaction delay and resolves once it has settled.
+ * `options.settleMs` - how long the head must be still (default `300`)
+
+### human.stop()
+Aborts the walk in progress (its Promise rejects with `stopped`) and releases the head.
+
+### human.active
+Set to `false` to suspend the controller without dropping its state.
+
+### human.route
+Waypoints of the walk in progress, or of the last one.
+
+### human.personality
+The traits in use: `basePitch` (radians, positive looks down), `turnTime` (gesture duration scale, 1 = median), `sprints`, `sprintDelay` (s), `jumpRate` (sprint-jumps/s, 0 = never), `lookAhead` (blocks), `stopRadius` (blocks), `reaction` (s), `glanceRate` (glances/s, 0 = never), `strafe` (probability), `deadband` (radians of steering error tolerated before the next correction).
+
 # Movement class
 This class configures how pathfinder plans its paths. It configures things like block breaking or different costs for moves. This class can be extended to add or change how pathfinder calculates its moves.
 

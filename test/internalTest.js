@@ -1,7 +1,7 @@
 /* eslint-env mocha */
 
 const mineflayer = require('mineflayer')
-const { goals, pathfinder, Movements } = require('mineflayer-pathfinder')
+const { goals, pathfinder, Movements, createHuman } = require('mineflayer-pathfinder')
 const { Vec3 } = require('vec3')
 const mc = require('minecraft-protocol')
 const assert = require('assert')
@@ -1220,5 +1220,78 @@ describe('pathfinder entity avoidance test', function () {
       assert.ok(path.length === 6, `Generated path length wrong (${path.length} === 6)`)
       assert.ok(leftBranch === true, `Generated path did not follow Left Branch [Left Branch: ${leftBranch}, Right Branch: ${rightBranch}, Forward Branch: ${forwardBranch}, Backward Branch: ${backwardBranch}]`)
     })
+  })
+})
+
+describe('human walker', function () {
+  const spawnPos = new Vec3(8.5, 1, 8.5) // Center of the chunk & center of the block
+  const goal = new Vec3(3.5, 1, 12.5)
+  const faceAt = new Vec3(3.5, 2.6, 2.5)
+
+  /** @type { import('mineflayer').Bot & { pathfinder: import('mineflayer-pathfinder').Pathfinder }} */
+  let bot
+  /** @type { import('minecraft-protocol').Server } */
+  let server
+  /** @type { import('mineflayer-pathfinder').Human } */
+  let human
+
+  before(async () => {
+    const chunk = flatMap(Version)
+    server = await newServer(server, chunk, spawnPos, Version, true)
+    bot = mineflayer.createBot({
+      username: 'player',
+      version: Version,
+      port: ServerPort
+    })
+    await once(bot, 'chunkColumnLoad')
+    bot.loadPlugin(pathfinder)
+    human = createHuman(bot, { seed: 7 })
+  })
+  after(() => {
+    human.active = false
+    server.close()
+  })
+
+  it('seed reproduces a personality', function () {
+    const a = createHuman(bot, { seed: 123 })
+    const b = createHuman(bot, { seed: 123 })
+    a.active = false
+    b.active = false
+    assert.deepStrictEqual(a.personality, b.personality)
+    assert.strictEqual(createHuman(bot, { seed: 1, personality: { sprints: false } }).personality.sprints, false)
+  })
+
+  it('walkTo stops at the goal facing faceAt, on the sensitivity grid', async function () {
+    this.timeout(15000)
+    this.slow(6000)
+    const sens = 0.15 * Math.PI / 180
+    const rotations = []
+    const onMove = () => rotations.push([bot.entity.yaw, bot.entity.pitch])
+    bot.on('move', onMove)
+    await human.walkTo(goal, { faceAt })
+    bot.off('move', onMove)
+
+    const p = bot.entity.position
+    assert.ok(Math.hypot(p.x - goal.x, p.z - goal.z) < 1, `stopped ${p} away from ${goal}`)
+    assert.ok(Math.hypot(bot.entity.velocity.x, bot.entity.velocity.z) < 0.02, 'still moving')
+    assert.ok(human.route.length >= 2 && human.route[human.route.length - 1].equals(goal))
+
+    const wantYaw = Math.atan2(-(faceAt.x - p.x), -(faceAt.z - p.z))
+    const yawErr = Math.abs(Math.atan2(Math.sin(wantYaw - bot.entity.yaw), Math.cos(wantYaw - bot.entity.yaw)))
+    assert.ok(yawErr < 2 * Math.PI / 180, `facing ${yawErr * 180 / Math.PI}° off faceAt`)
+    assert.ok(bot.entity.pitch > 0, 'faceAt is above eye level, pitch should look up')
+
+    for (const [y, pch] of rotations) {
+      for (const a of [y, pch]) assert.ok(Math.abs(a / sens - Math.round(a / sens)) < 1e-6, `rotation ${a} off the sensitivity grid`)
+    }
+  })
+
+  it('walkTo rejects when superseded', async function () {
+    this.timeout(15000)
+    bot.entity.position = spawnPos.clone()
+    const first = human.walkTo(goal)
+    const second = human.walkTo(spawnPos.offset(2, 0, 0))
+    await assert.rejects(first, /superseded/)
+    await second
   })
 })
