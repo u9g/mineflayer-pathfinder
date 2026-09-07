@@ -1299,9 +1299,12 @@ describe('human walker', function () {
     this.timeout(15000)
     bot.entity.position = spawnPos.clone()
     await once(bot, 'physicsTick')
-    await human.walkTo(spawnPos.offset(0.2, 0, -0.2))
+    await human.walkTo(spawnPos.offset(0.2, 0, -0.2), { faceAt })
     const p = bot.entity.position
     assert.ok(Math.hypot(p.x - spawnPos.x, p.z - spawnPos.z) < 1, `walked off to ${p}`)
+    const wantYaw = Math.atan2(-(faceAt.x - p.x), -(faceAt.z - p.z))
+    const yawErr = Math.abs(Math.atan2(Math.sin(wantYaw - bot.entity.yaw), Math.cos(wantYaw - bot.entity.yaw)))
+    assert.ok(yawErr < 2 * Math.PI / 180, `facing ${yawErr * 180 / Math.PI} deg off faceAt`)
   })
 
   it('walkTo walks to the closest reachable point before rejecting with no path', async function () {
