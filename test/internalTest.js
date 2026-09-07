@@ -1295,6 +1295,15 @@ describe('human walker', function () {
     await second
   })
 
+  it('walkTo resolves when the bot already stands in the goal block', async function () {
+    this.timeout(15000)
+    bot.entity.position = spawnPos.clone()
+    await once(bot, 'physicsTick')
+    await human.walkTo(spawnPos.offset(0.2, 0, -0.2))
+    const p = bot.entity.position
+    assert.ok(Math.hypot(p.x - spawnPos.x, p.z - spawnPos.z) < 1, `walked off to ${p}`)
+  })
+
   it('walkTo walks to the closest reachable point before rejecting with no path', async function () {
     this.timeout(20000)
     this.slow(8000)
