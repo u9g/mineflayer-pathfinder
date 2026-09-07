@@ -1307,6 +1307,36 @@ describe('human walker', function () {
     assert.ok(yawErr < 2 * Math.PI / 180, `facing ${yawErr * 180 / Math.PI} deg off faceAt`)
   })
 
+  it('a superseded walkTo stops searching instead of running out its think timeout', async function () {
+    this.timeout(15000)
+    bot.entity.position = spawnPos.clone()
+    await once(bot, 'physicsTick')
+    const realGetPath = bot.pathfinder.getPathFromTo.bind(bot.pathfinder)
+    let slices = 0
+    let stubbed = false
+    // A search that only converges after many slices, standing in for one that runs out its think timeout.
+    const SLICES = 400
+    bot.pathfinder.getPathFromTo = (...args) => {
+      if (stubbed) return realGetPath(...args)
+      stubbed = true
+      return {
+        next: () => {
+          slices++
+          const result = { status: slices < SLICES ? 'partial' : 'timeout', path: [] }
+          return { done: slices >= SLICES, value: { result } }
+        }
+      }
+    }
+    const first = human.walkTo(spawnPos.offset(0, 0, 6))
+    await new Promise(resolve => setImmediate(resolve))
+    const second = human.walkTo(spawnPos.offset(1, 0, 0))
+    const atSupersede = slices
+    await assert.rejects(first, /superseded/)
+    await second
+    bot.pathfinder.getPathFromTo = realGetPath
+    assert.ok(slices - atSupersede <= 1, `superseded search ran ${slices - atSupersede} more slices`)
+  })
+
   it('walkTo walks to the closest reachable point before rejecting with no path', async function () {
     this.timeout(20000)
     this.slow(8000)
