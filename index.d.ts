@@ -10,6 +10,63 @@ import AStar from './lib/astar';
 declare module 'mineflayer-pathfinder' {
 	export function pathfinder(bot: Bot): void;
 
+	/** Walks routes the way a player does: pure-pursuit steering, mouse-like head gestures, human sprint and jump timing. */
+	export function createHuman(bot: Bot, options?: HumanOptions): Human;
+
+	export interface Personality {
+		/** radians, positive is looking down */
+		basePitch: number;
+		/** scales how long one mouse gesture takes (1 = the measured median) */
+		turnTime: number;
+		sprints: boolean;
+		/** seconds between first step and sprint */
+		sprintDelay: number;
+		/** sprint-jumps per second, 0 = never */
+		jumpRate: number;
+		/** pursuit distance in blocks */
+		lookAhead: number;
+		/** release forward this far (plus coast distance) from the goal */
+		stopRadius: number;
+		/** seconds before acting on a new order */
+		reaction: number;
+		/** sideways glances per second while walking, 0 = never */
+		glanceRate: number;
+		/** probability of strafing rather than turning for a 20-60° correction */
+		strafe: number;
+		/** radians of steering error tolerated while walking before the next gesture */
+		deadband: number;
+	}
+
+	export interface HumanOptions {
+		/** the same seed reproduces the same personality and noise */
+		seed?: number;
+		personality?: Partial<Personality>;
+		/** used for planning; default is a walking-only instance (no digging, placing, towers or parkour) */
+		movements?: Movements;
+		/** planning timeout in ms; default bot.pathfinder.thinkTimeout */
+		thinkTimeout?: number;
+	}
+
+	export interface WalkOptions {
+		/** stop within this distance of the goal; default is the personality's stopRadius */
+		radius?: number;
+		/** ms; default 60000 */
+		timeout?: number;
+		/** look at this point once arrived; the walk resolves after the look settles */
+		faceAt?: Vec3;
+	}
+
+	export interface Human {
+		personality: Personality;
+		/** waypoints of the walk in progress, or of the last one */
+		route: Vec3[];
+		/** set to false to suspend the controller without dropping its state */
+		active: boolean;
+		walkTo(goal: Vec3, options?: WalkOptions): Promise<void>;
+		lookAt(point: Vec3, options?: { settleMs?: number }): Promise<void>;
+		stop(): void;
+	}
+
 	export interface Pathfinder {
 		thinkTimeout: number;
 		/** ms, amount of thinking per tick (max 50 ms) */
