@@ -1258,7 +1258,9 @@ describe('human walker', function () {
     a.active = false
     b.active = false
     assert.deepStrictEqual(a.personality, b.personality)
-    assert.strictEqual(createHuman(bot, { seed: 1, personality: { sprints: false } }).personality.sprints, false)
+    const c = createHuman(bot, { seed: 1, personality: { sprints: false } })
+    c.active = false
+    assert.strictEqual(c.personality.sprints, false)
   })
 
   it('walkTo stops at the goal facing faceAt, on the sensitivity grid', async function () {
@@ -1284,6 +1286,26 @@ describe('human walker', function () {
     for (const [y, pch] of rotations) {
       for (const a of [y, pch]) assert.ok(Math.abs(a / sens - Math.round(a / sens)) < 1e-6, `rotation ${a} off the sensitivity grid`)
     }
+  })
+
+  it('a rotation forced after the walk stands', async function () {
+    this.timeout(15000)
+    bot.entity.position = spawnPos.clone()
+    await human.walkTo(goal)
+    bot.entity.yaw = 1.25
+    bot.entity.pitch = -0.5
+    bot.emit('forcedMove')
+    await bot.waitForTicks(10)
+    assert.strictEqual(bot.entity.yaw, 1.25, 'yaw was pulled back after the walk')
+    assert.strictEqual(bot.entity.pitch, -0.5, 'pitch was pulled back after the walk')
+
+    await human.lookAt(faceAt)
+    bot.entity.yaw = -0.75
+    bot.entity.pitch = 0.25
+    bot.emit('forcedMove')
+    await bot.waitForTicks(10)
+    assert.strictEqual(bot.entity.yaw, -0.75, 'yaw was pulled back after lookAt')
+    assert.strictEqual(bot.entity.pitch, 0.25, 'pitch was pulled back after lookAt')
   })
 
   it('walkTo rejects when superseded', async function () {
