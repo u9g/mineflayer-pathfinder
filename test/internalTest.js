@@ -1294,4 +1294,16 @@ describe('human walker', function () {
     await assert.rejects(first, /superseded/)
     await second
   })
+
+  it('walkTo walks to the closest reachable point before rejecting with no path', async function () {
+    this.timeout(20000)
+    this.slow(8000)
+    bot.entity.position = spawnPos.clone()
+    await once(bot, 'physicsTick')
+    // Beyond the loaded chunk: the search ends without reaching it.
+    await assert.rejects(human.walkTo(spawnPos.offset(0, 0, 60)), /no path/)
+    const p = bot.entity.position
+    assert.ok(p.z > spawnPos.z + 3, `stopped at ${p}, did not head for the goal`)
+    assert.ok(human.route.length >= 2 && !human.route[human.route.length - 1].equals(spawnPos.offset(0, 0, 60)), 'route must end at the closest node, not the goal')
+  })
 })
