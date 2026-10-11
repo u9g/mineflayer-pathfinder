@@ -172,7 +172,7 @@ func compute(self &Search mut) int {
 // Adds the route to neighbor through the node at from, if it's new or better
 func consider(self &Search mut, from int, fromG float, neighbor Move) {
   key = neighbor.pos();
-  existing = if (self.byPos.has(&key)) { self.byPos.get(&key) } else { -1 };
+  existing = if (self.byPos.has(&key)) { clone(self.byPos.get(&key)) } else { 0 - 1 };
   if (existing >= 0 and self.nodes.get(existing).closed) {
     return void(); // skip closed neighbors
   }

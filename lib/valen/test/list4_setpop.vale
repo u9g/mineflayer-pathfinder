@@ -1,0 +1,19 @@
+// List set and pop; main returns 0, or the number of the failed check.
+// uses: list.vale
+
+struct P {
+  a int;
+  b float;
+}
+
+exported func main() int {
+  l = List<int>();
+  l.add(1);
+  l.add(2);
+  old = l.set(0, 5);
+  if (old != 1) { return 1; }
+  last = l.pop();
+  if (last != 2) { return 2; }
+  if (l.get(0) != 5) { return 3; }
+  return 0;
+}

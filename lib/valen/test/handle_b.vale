@@ -30,3 +30,4 @@ exported func main() int {
 }
 
 export List<int> as IntList;
+export []int as IntArray;

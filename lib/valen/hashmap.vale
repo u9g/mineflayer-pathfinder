@@ -94,5 +94,5 @@ where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) v
 
 func floorMod(a int, b int) int {
   m = mod(a, b);
-  return if (m < 0) { m + b } else { m };
+  return if (m < 0) { m + b } else { clone(m) };
 }

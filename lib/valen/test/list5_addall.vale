@@ -1,0 +1,19 @@
+// List addAll and reversed; main returns 0, or the number of the failed check.
+// uses: list.vale
+
+struct P {
+  a int;
+  b float;
+}
+
+exported func main() int {
+  a = List<int>();
+  a.add(1);
+  b = List<int>();
+  b.add(2);
+  b.add(3);
+  a.addAll(^b);
+  if (a.len() != 3) { return 1; }
+  if (a.get(2) != 3) { return 2; }
+  return 0;
+}

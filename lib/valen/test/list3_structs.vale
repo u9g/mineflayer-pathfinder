@@ -1,0 +1,15 @@
+// List of structs; main returns 0, or the number of the failed check.
+// uses: list.vale
+
+struct P {
+  a int;
+  b float;
+}
+
+exported func main() int {
+  l = List<P>();
+  l.add(P(1, 2.0));
+  l.add(P(3, 4.0));
+  if (l.get(1).a != 3) { return 1; }
+  return 0;
+}
