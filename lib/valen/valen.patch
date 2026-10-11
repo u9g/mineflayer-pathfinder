@@ -91,6 +91,105 @@ index 1c73af7c..98637f20 100644
  namespace std {
    template<> struct hash<VarNameM> {
      size_t operator()(const VarNameM& v) const { return std::hash<std::string>()(v.name); }
+diff --git a/Backend/src/metal/instructions.h b/Backend/src/metal/instructions.h
+index b9ab24f4..8d9575e5 100644
+--- a/Backend/src/metal/instructions.h
++++ b/Backend/src/metal/instructions.h
+@@ -609,8 +609,9 @@ public:
+ 
+   DestroyRuntimeSizedArray(
+       SourceLocation* sourceLocation_,
+-      Expression* arrayExpr_) :
+-    Expression(sourceLocation_), arrayExpr(arrayExpr_) {}
++      Expression* arrayExpr_,
++      Kind* arrayType_) :
++    Expression(sourceLocation_), arrayExpr(arrayExpr_), arrayType(arrayType_) {}
+ };
+ 
+ class NewStruct : public Expression {
+diff --git a/Backend/src/metal/metal_cache_ffi.cpp b/Backend/src/metal/metal_cache_ffi.cpp
+index f9062f46..d0e87258 100644
+--- a/Backend/src/metal/metal_cache_ffi.cpp
++++ b/Backend/src/metal/metal_cache_ffi.cpp
+@@ -503,8 +503,8 @@ extern "C" VIS ExpressionHandle* metal_expr_destroy_static_sized_array_into_loca
+       ex(expr), reinterpret_cast<StaticSizedArrayT*>(knd(static_sized_array)),
+       locals(destination_locals, local_count)));
+ }
+-extern "C" VIS ExpressionHandle* metal_expr_destroy_mut_runtime_sized_array(ExpressionHandle* array_expr, SourceLocationHandle* source_loc) {
+-  return reinterpret_cast<ExpressionHandle*>(new DestroyRuntimeSizedArray(srcloc(source_loc), ex(array_expr)));
++extern "C" VIS ExpressionHandle* metal_expr_destroy_mut_runtime_sized_array(ExpressionHandle* array_expr, KindHandle* array_type, SourceLocationHandle* source_loc) {
++  return reinterpret_cast<ExpressionHandle*>(new DestroyRuntimeSizedArray(srcloc(source_loc), ex(array_expr), knd(array_type)));
+ }
+ 
+ 
+diff --git a/Backend/src/metal/metal_cache_ffi.h b/Backend/src/metal/metal_cache_ffi.h
+index e26e39f2..1172ec7c 100644
+--- a/Backend/src/metal/metal_cache_ffi.h
++++ b/Backend/src/metal/metal_cache_ffi.h
+@@ -227,7 +227,7 @@ ExpressionHandle* metal_expr_destroy_static_sized_array_into_function(
+ ExpressionHandle* metal_expr_destroy_static_sized_array_into_locals(
+     ExpressionHandle* expr, KindHandle* static_sized_array,
+     LocalHandle* const* destination_locals, size_t local_count, SourceLocationHandle* loc);
+-ExpressionHandle* metal_expr_destroy_mut_runtime_sized_array(ExpressionHandle* array_expr, SourceLocationHandle* loc);
++ExpressionHandle* metal_expr_destroy_mut_runtime_sized_array(ExpressionHandle* array_expr, KindHandle* array_type, SourceLocationHandle* loc);
+ 
+ 
+ PackageBuilderHandle* metal_package_builder_new(
+diff --git a/Backend/src/region/rcimm/rcimm.cpp b/Backend/src/region/rcimm/rcimm.cpp
+index 1c59587f..b1d0889f 100644
+--- a/Backend/src/region/rcimm/rcimm.cpp
++++ b/Backend/src/region/rcimm/rcimm.cpp
+@@ -854,7 +854,8 @@ LLVMTypeRef RCImm::translateType(Kind* referenceM) {
+     // return primitives.translatePrimitive(globalState, referenceM);
+   } else {
+     if (dynamic_cast<Str *>(valueType) != nullptr) {
+-      assert(dynamic_cast<ShareRef*>(referenceM) != nullptr);
++      // Strings are single-owned now, so they come owned or borrowed as well as shared; all are a
++      // pointer to the string's wrapper.
+       return LLVMPointerType(kindStructs.getStringWrapperStruct(), 0);
+     } else if (auto staticSizedArrayMT = dynamic_cast<StaticSizedArrayT *>(valueType)) {
+       assert(dynamic_cast<ShareRef*>(referenceM) != nullptr);
+diff --git a/src/backend_ffi/metal_cache.rs b/src/backend_ffi/metal_cache.rs
+index 585ee6ef..b3df0cee 100644
+--- a/src/backend_ffi/metal_cache.rs
++++ b/src/backend_ffi/metal_cache.rs
+@@ -280,7 +280,7 @@ extern "C" {
+         expr: *mut c_void, static_sized_array: *mut c_void,
+         destination_locals: *const *mut c_void, local_count: usize, loc: *mut c_void,
+     ) -> *mut c_void;
+-    fn metal_expr_destroy_mut_runtime_sized_array(array_expr: *mut c_void, loc: *mut c_void) -> *mut c_void;
++    fn metal_expr_destroy_mut_runtime_sized_array(array_expr: *mut c_void, array_type: *mut c_void, loc: *mut c_void) -> *mut c_void;
+ 
+     fn metal_package_builder_new(_: *mut MetalCacheHandleRaw, package_coord: *mut c_void, is_rust_crate: bool) -> *mut c_void;
+     fn metal_package_builder_add_interface(_: *mut c_void, name_ptr: *const c_char, name_len: usize, v: *mut c_void);
+@@ -824,8 +824,8 @@ impl MetalCache {
+         let ptrs = ptrs!(destination_locals);
+         unsafe { Expression(NonNull::new(metal_expr_destroy_static_sized_array_into_locals(expr.0.as_ptr(), static_sized_array.0.as_ptr(), ptrs.as_ptr(), ptrs.len(), loc_ptr(loc))).unwrap(), PhantomData) }
+     }
+-    pub fn expr_destroy_mut_runtime_sized_array<'c>(&'c self, array_expr: Expression<'c>, loc: SourceLocation<'c>) -> Expression<'c> {
+-        unsafe { Expression(NonNull::new(metal_expr_destroy_mut_runtime_sized_array(array_expr.0.as_ptr(), loc_ptr(loc))).unwrap(), PhantomData) }
++    pub fn expr_destroy_mut_runtime_sized_array<'c>(&'c self, array_expr: Expression<'c>, array_type: Kind<'c>, loc: SourceLocation<'c>) -> Expression<'c> {
++        unsafe { Expression(NonNull::new(metal_expr_destroy_mut_runtime_sized_array(array_expr.0.as_ptr(), array_type.0.as_ptr(), loc_ptr(loc))).unwrap(), PhantomData) }
+     }
+ 
+     pub fn new_package_builder<'c>(
+diff --git a/src/backend_ffi/metal_lowerer.rs b/src/backend_ffi/metal_lowerer.rs
+index 14e17bc4..0e0d1441 100644
+--- a/src/backend_ffi/metal_lowerer.rs
++++ b/src/backend_ffi/metal_lowerer.rs
+@@ -602,7 +602,11 @@ impl<'cache, 'cm, 'sm> Lowerer<'cache, 'cm, 'sm> {
+                 loc,
+             ),
+             ExpressionIE::DestroyRuntimeSizedArray(x) => {
+-                c.expr_destroy_mut_runtime_sized_array(self.lower_expression(&x.array_expr), loc)
++                c.expr_destroy_mut_runtime_sized_array(
++                    self.lower_expression(&x.array_expr),
++                    self.lower_kind(x.array_type),
++                    loc,
++                )
+             }
+         }
+     }
 diff --git a/src/bin/valec/build.rs b/src/bin/valec/build.rs
 index 08fad758..dc3ba3e8 100644
 --- a/src/bin/valec/build.rs

@@ -1,6 +1,6 @@
 // Can JS hold a Valen object between calls? Variant B: List<int> exported by name. handle_b.js drives it.
 // exports: newSearch,step,total
-// uses: list.vale
+// uses: prelude.vale list.vale
 
 exported struct Counter {
   count int;

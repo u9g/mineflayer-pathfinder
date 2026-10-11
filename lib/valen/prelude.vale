@@ -1,0 +1,3 @@
+// What the pathfinder uses of Valen's stdlib, which build.sh leaves out (--no-std).
+
+func void() { }

@@ -1,6 +1,6 @@
 // Can JS hold a Valen object between calls? Variant C: a HashMap field, exported down to its arrays. handle_b.js drives it.
 // exports: newSearch,step,total
-// uses: list.vale hashmap.vale
+// uses: prelude.vale list.vale hashmap.vale
 
 exported struct Counter {
   count int;

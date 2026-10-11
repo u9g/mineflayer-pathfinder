@@ -1,5 +1,5 @@
 // List of structs; main returns 0, or the number of the failed check.
-// uses: list.vale
+// uses: prelude.vale list.vale
 
 struct P {
   a int;
