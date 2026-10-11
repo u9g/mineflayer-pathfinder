@@ -5,7 +5,7 @@
 // into a slot JS allocates, and JS passes that slot back as the box's borrow. (Valen can't yet
 // take an owned struct or array back from the host, so endSearch empties the box rather than
 // destroying it.)
-// exports: newSearch,computeSearch,searchCost,visitedNodes,generatedNodes,reportPath,endSearch
+// exports: newSearch,computeSearch,searchCost,visitedNodes,generatedNodes,reportPath,endSearch,nodeCount,nodeG,nodeH,nodeF,nodeParent,nodeHeapIndex,nodeClosed,searchResult
 
 extern func pathMove(x int, y int, z int, remainingBlocks int, cost float, parkour bool);
 extern func pathBreak(x int, y int, z int);
@@ -81,6 +81,16 @@ exported func reportPath(box &[]Search) {
 exported func endSearch(box &[]Search mut) {
   drop(box.pop());
 }
+
+// For tests: a search's nodes, by index
+exported func nodeCount(box &[]Search) int { return box[0].nodes.len(); }
+exported func nodeG(box &[]Search, i int) float { return box[0].nodes.get(i).g; }
+exported func nodeH(box &[]Search, i int) float { return box[0].nodes.get(i).h; }
+exported func nodeF(box &[]Search, i int) float { return box[0].nodes.get(i).f; }
+exported func nodeParent(box &[]Search, i int) int { return box[0].nodes.get(i).parent; }
+exported func nodeHeapIndex(box &[]Search, i int) int { return box[0].nodes.get(i).heapIndex; }
+exported func nodeClosed(box &[]Search, i int) bool { return box[0].nodes.get(i).closed; }
+exported func searchResult(box &[]Search) int { return box[0].result; }
 
 // valec only builds programs; lib/valenAStar.js never calls this
 exported func main() int {
