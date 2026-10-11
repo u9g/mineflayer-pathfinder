@@ -1,0 +1,61 @@
+// Checks the A* heap alone: after every push, update and pop, each position's node records
+// that position, and pops come out in order of f. runHeapTest returns 0, or 100 * step + check.
+// heap_test.js runs it, stubbing the pathfinder's externs.
+// exports: runHeapTest
+// uses: prelude.vale list.vale hashmap.vale world.vale movements.vale astar.vale
+
+func node(f float) PathNode {
+  return PathNode(Move(0, 0, 0, 0, 0.0), 0.0, 0.0, f, 0 - 1, false, 0 - 1);
+}
+
+// 0 if every slot's node records its slot, else the first bad slot
+func consistent(heap &Heap, nodes &List<PathNode>) int {
+  i = 1;
+  while (i < heap.items.len()) {
+    if (nodes.get(clone(heap.items.get(i))).heapIndex != i) {
+      return clone(i);
+    }
+    set i = i + 1;
+  }
+  return 0;
+}
+
+exported func runHeapTest() int {
+  nodes = List<PathNode>();
+  heap = Heap();
+  fs = [#](5.0, 3.0, 8.0, 1.0, 9.0, 2.0, 7.0, 6.0, 4.0, 10.0);
+  i = 0;
+  while (i < 10) {
+    nodes.add(node(fs[clone(i)]));
+    heap.push(&nodes, clone(i));
+    bad = consistent(&heap, &nodes);
+    if (bad != 0) { return 100 * (i + 1) + bad; }
+    set i = i + 1;
+  }
+  // Lower two nodes' f and update them, as consider does
+  set nodes.get(4).f = 0.5;
+  heap.update(&nodes, 4);
+  bad = consistent(&heap, &nodes);
+  if (bad != 0) { return 1100 + bad; }
+  set nodes.get(7).f = 2.5;
+  heap.update(&nodes, 7);
+  bad = consistent(&heap, &nodes);
+  if (bad != 0) { return 1200 + bad; }
+
+  last = 0.0 - 1.0;
+  step = 13;
+  while (not heap.isEmpty()) {
+    popped = heap.pop(&nodes);
+    f = clone(nodes.get(popped).f);
+    if (f < last) { return 100 * step + 99; }
+    set last = f;
+    bad = consistent(&heap, &nodes);
+    if (bad != 0) { return 100 * step + bad; }
+    set step = step + 1;
+  }
+  return 0;
+}
+
+exported func main() int {
+  return 0;
+}
