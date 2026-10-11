@@ -40,12 +40,12 @@ exported struct Placement {
   dz int;
   jump bool;
   useOne bool; // use the block there (open a gate) instead of placing one
-  returnPos Opt<Pos>;
+  hasReturnPos bool;
+  returnPos Pos; // where to stand again afterwards, if hasReturnPos
 }
 
 func Placement(x int, y int, z int, dx int, dy int, dz int) Placement {
-  noReturn Opt<Pos> = None<Pos>();
-  return Placement(x, y, z, dx, dy, dz, false, false, ^noReturn);
+  return Placement(x, y, z, dx, dy, dz, false, false, false, Pos(0, 0, 0));
 }
 
 func sqrt2() float {
@@ -153,8 +153,7 @@ func getMoveJumpUp(self &World mut, node &Move, dirX int, dirZ int, neighbors &L
         if (not self.safeToBreak(&blockD)) { return void(); }
         toBreak.add(blockD.pos());
       }
-      returnPos Opt<Pos> = Some(Pos(node.x, node.y, node.z));
-      toPlace.add(Placement(node.x, node.y - 1, node.z, dirX, 0, dirZ, false, false, ^returnPos));
+      toPlace.add(Placement(node.x, node.y - 1, node.z, dirX, 0, dirZ, false, false, true, Pos(node.x, node.y, node.z)));
       set cost = cost + self.settings.placeCost;
     }
 
@@ -209,8 +208,7 @@ func getMoveForward(self &World mut, node &Move, dirX int, dirZ int, neighbors &
 
   if (self.settings.canOpenDoors and blockC.openable and blockC.hasShapes) {
     // Open the fence gate: use the block there instead of placing one
-    noReturn Opt<Pos> = None<Pos>();
-    toPlace.add(Placement(node.x + dirX, node.y, node.z + dirZ, 0, 0, 0, false, true, ^noReturn));
+    toPlace.add(Placement(node.x + dirX, node.y, node.z + dirZ, 0, 0, 0, false, true, false, Pos(0, 0, 0)));
   } else {
     set cost = cost + self.safeOrBreak(&blockC, &toBreak);
     if (cost > 100.0) { return void(); }
@@ -293,31 +291,31 @@ func getMoveDiagonal(self &World mut, node &Move, dirX int, dirZ int, neighbors 
   }
 }
 
-// Where the bot lands dropping down from node by dirX, dirZ, as a block in getLandingBlock's
-// terms; None if it would fall too far or into something unsafe
-func getLandingBlock(self &World mut, node &Move, dirX int, dirZ int) Opt<Block> {
+// Where the bot lands dropping down from node by dirX, dirZ, as getLandingBlock finds it; found
+// is false if it would fall too far or into something unsafe
+struct Landing {
+  found bool;
+  block Block;
+}
+
+func getLandingBlock(self &World mut, node &Move, dirX int, dirZ int) Landing {
   blockLand = self.near(node, dirX, -2, dirZ);
   while (blockLand.loaded and blockLand.y > self.settings.minY) {
     if (blockLand.liquid and blockLand.safe) {
-      found Opt<Block> = Some(^blockLand);
-      return ^found;
+      return Landing(true, ^blockLand);
     }
     if (blockLand.physical) {
       if (not (float(&(node.y - blockLand.y)) > self.settings.maxDropDown)) {
-        above Opt<Block> = Some(self.near(&blockLand, 0, 1, 0));
-        return ^above;
+        return Landing(true, self.near(&blockLand, 0, 1, 0));
       }
-      nothing Opt<Block> = None<Block>();
-      return ^nothing;
+      return Landing(false, ^blockLand);
     }
     if (not blockLand.safe) {
-      nothing Opt<Block> = None<Block>();
-      return ^nothing;
+      return Landing(false, ^blockLand);
     }
     set blockLand = self.near(&blockLand, 0, -1, 0);
   }
-  nothing Opt<Block> = None<Block>();
-  return ^nothing;
+  return Landing(false, ^blockLand);
 }
 
 func getMoveDropDown(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
@@ -328,9 +326,8 @@ func getMoveDropDown(self &World mut, node &Move, dirX int, dirZ int, neighbors 
   cost = 1.0; // move cost
   toBreak = List<Pos>();
 
-  maybeLand = self.getLandingBlock(node, dirX, dirZ);
-  if (maybeLand.isEmpty()) { return void(); }
-  blockLand = (^maybeLand).get();
+  [found, blockLand] = self.getLandingBlock(node, dirX, dirZ);
+  if (not found) { return void(); }
   // Don't drop down into water
   if (not self.settings.infiniteLiquidDropdownDistance and float(&(node.y - blockLand.y)) > self.settings.maxDropDown) { return void(); }
 
@@ -354,9 +351,8 @@ func getMoveDown(self &World mut, node &Move, neighbors &List<Move> mut) {
   cost = 1.0; // move cost
   toBreak = List<Pos>();
 
-  maybeLand = self.getLandingBlock(node, 0, 0);
-  if (maybeLand.isEmpty()) { return void(); }
-  blockLand = (^maybeLand).get();
+  [found, blockLand] = self.getLandingBlock(node, 0, 0);
+  if (not found) { return void(); }
 
   set cost = cost + self.safeOrBreak(&block0, &toBreak);
   if (cost > 100.0) { return void(); }
@@ -392,8 +388,7 @@ func getMoveUp(self &World mut, node &Move, neighbors &List<Move> mut) {
     block0 = self.near(node, 0, -1, 0);
     if (block0.physical and block0.height - float(&node.y) < -0.2) { return void(); } // cannot jump-place from a half block
 
-    noReturn Opt<Pos> = None<Pos>();
-    toPlace.add(Placement(node.x, node.y - 1, node.z, 0, 1, 0, true, false, ^noReturn));
+    toPlace.add(Placement(node.x, node.y - 1, node.z, 0, 1, 0, true, false, false, Pos(0, 0, 0)));
     set cost = cost + self.settings.placeCost;
   }
 

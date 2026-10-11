@@ -69,12 +69,9 @@ exported func reportPath(box &[]Search) {
     set j = 0;
     while (j < move.toPlace.len()) {
       p = move.toPlace.get(j);
-      if (p.returnPos.isEmpty()) {
-        pathPlace(p.x, p.y, p.z, p.dx, p.dy, p.dz, p.jump, p.useOne, false, 0, 0, 0);
-      } else {
-        r = p.returnPos.get();
-        pathPlace(p.x, p.y, p.z, p.dx, p.dy, p.dz, p.jump, p.useOne, true, r.x, r.y, r.z);
-      }
+      pathPlace(
+        p.x, p.y, p.z, p.dx, p.dy, p.dz, p.jump, p.useOne,
+        p.hasReturnPos, p.returnPos.x, p.returnPos.y, p.returnPos.z);
       set j = j + 1;
     }
   }

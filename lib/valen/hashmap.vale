@@ -1,9 +1,13 @@
 // A hash map with open addressing and linear probing. Keys need hash and ==. There's no
-// removal, which the pathfinder doesn't need, so a slot once filled stays filled.
+// removal, which the pathfinder doesn't need.
+//
+// The entries live densely in insertion order, and the slot table holds each one's index there,
+// or -1 for an empty slot. (Valen's backend can't make an interface value like Opt yet, so slots
+// can't be Opt<Entry>.)
 
 struct HashMap<K, V> {
-  slots List<Opt<Entry<K, V>>>;
-  size int;
+  entries List<Entry<K, V>>;
+  slots List<int>;
 }
 
 struct Entry<K, V> {
@@ -12,22 +16,21 @@ struct Entry<K, V> {
 }
 
 func HashMap<K, V>() HashMap<K, V> {
-  return HashMap<K, V>(emptySlots<K, V>(16), 0);
+  return HashMap<K, V>(List<Entry<K, V>>(), emptySlots(16));
 }
 
-func emptySlots<K, V>(capacity int) List<Opt<Entry<K, V>>> {
-  slots = List<Opt<Entry<K, V>>>();
+func emptySlots(capacity int) List<int> {
+  slots = List<int>();
   i = 0;
   while (i < capacity) {
-    empty Opt<Entry<K, V>> = None<Entry<K, V>>();
-    slots.add(^empty);
+    slots.add(0 - 1);
     set i = i + 1;
   }
   return ^slots;
 }
 
 func len<K, V>(self &HashMap<K, V>) int {
-  return self.size;
+  return self.entries.len();
 }
 
 // The slot holding key, or the empty slot where it would go
@@ -36,11 +39,11 @@ where func hash(&K) int, func ==(&K, &K) bool {
   capacity = self.slots.len();
   i = floorMod(hash(key), capacity);
   while (true) {
-    slot = self.slots.get(i);
-    if (slot.isEmpty()) {
+    entry = clone(self.slots.get(i));
+    if (entry < 0) {
       return i;
     }
-    if (slot.get().key == key) {
+    if (self.entries.get(entry).key == key) {
       return i;
     }
     set i = floorMod(i + 1, capacity);
@@ -50,46 +53,42 @@ where func hash(&K) int, func ==(&K, &K) bool {
 
 func has<K, V>(self &HashMap<K, V>, key &K) bool
 where func hash(&K) int, func ==(&K, &K) bool {
-  return not self.slots.get(self.slotOf(key)).isEmpty();
+  return not (self.slots.get(self.slotOf(key)) < 0);
 }
 
-// The value for key; panics if there is none, so check has first
+// The value for key; check has first
 func get<K, V>(self &HashMap<K, V>, key &K) &V
 where func hash(&K) int, func ==(&K, &K) bool {
-  return &self.slots.get(self.slotOf(key)).get().value;
+  entry = clone(self.slots.get(self.slotOf(key)));
+  return &self.entries.get(entry).value;
 }
 
 // Adds key, or replaces its value
 func put<K, V>(self &HashMap<K, V> mut, key K, value V)
 where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) void {
-  // Keep at most half the slots full, so probes stay short
-  if ((self.size + 1) * 2 > self.slots.len()) {
-    self.grow();
-  }
   i = self.slotOf(&key);
-  if (self.slots.get(i).isEmpty()) {
-    set self.size = self.size + 1;
+  entry = clone(self.slots.get(i));
+  if (entry < 0) {
+    self.slots.set(i, self.entries.len());
+    self.entries.add(Entry<K, V>(^key, ^value));
+    // Keep at most half the slots full, so probes stay short
+    if (self.entries.len() * 2 > self.slots.len()) {
+      self.grow();
+    }
+  } else {
+    drop(self.entries.set(entry, Entry<K, V>(^key, ^value)));
   }
-  filled Opt<Entry<K, V>> = Some(Entry<K, V>(^key, ^value));
-  old = self.slots.set(i, ^filled);
-  drop(^old);
 }
 
+// Doubles the slot table and puts every entry back in it
 func grow<K, V>(self &HashMap<K, V> mut)
-where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) void {
-  old = set self.slots = emptySlots<K, V>(self.slots.len() * 2);
-  set self.size = 0;
-  while (not old.isEmpty()) {
-    slot = old.pop();
-    if (slot.isEmpty()) {
-      drop(^slot);
-    } else {
-      [key, value] = (^slot).get();
-      self.put(^key, ^value);
-    }
+where func hash(&K) int, func ==(&K, &K) bool {
+  drop(set self.slots = emptySlots(self.slots.len() * 2));
+  i = 0;
+  while (i < self.entries.len()) {
+    self.slots.set(self.slotOf(&self.entries.get(i).key), clone(i));
+    set i = i + 1;
   }
-  [array] = ^old;
-  [] = ^array;
 }
 
 func floorMod(a int, b int) int {
