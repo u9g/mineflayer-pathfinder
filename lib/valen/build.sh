@@ -38,8 +38,12 @@ exec "$WASI_SDK_PATH/bin/clang" $flags "\$@"
 WRAPPER
 chmod +x "$work/clang"
 
+# Without the borrow checker: it doesn't cover pushing to and popping from arrays yet
+# (unimplemented!() in Valen's groupify_function.rs), which every growable collection needs.
+# Valen's own HashMap tests are built the same way.
 "$VALEN_DIR/target/debug/valec" build \
   --no-std \
+  --borrow-check false \
   --builtins-dir-override "$VALEN_DIR/Backend/builtins" \
   --clang-override "$work/clang" \
   --target-triple wasm32-wasi \

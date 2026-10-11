@@ -76,3 +76,16 @@ index 1c73af7..98637f2 100644
  namespace std {
    template<> struct hash<VarNameM> {
      size_t operator()(const VarNameM& v) const { return std::hash<std::string>()(v.name); }
+diff --git a/src/bin/valec/build.rs b/src/bin/valec/build.rs
+index 08fad75..dc3ba3e 100644
+--- a/src/bin/valec/build.rs
++++ b/src/bin/valec/build.rs
+@@ -62,7 +62,7 @@ pub struct BuildArgs {
+   #[arg(long, default_value_t = true)]
+   sanity_check: bool,
+ 
+-  #[arg(long, default_value_t = true)]
++  #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+   borrow_check: bool,
+ 
+   #[arg(long, default_value_t = false)]

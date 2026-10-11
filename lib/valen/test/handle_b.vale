@@ -1,8 +1,8 @@
-// Can JS hold a Valen object between calls? Built as a reactor; handle.js drives it.
+// Can JS hold a Valen object between calls? Variant B: List<int> exported by name. handle_b.js drives it.
 // exports: newSearch,step,total
 // uses: list.vale
 
-struct Counter {
+exported struct Counter {
   count int;
   history List<int>;
 }
@@ -28,3 +28,5 @@ exported func total(self &Search) int {
 exported func main() int {
   return 0;
 }
+
+export List<int> as IntList;
