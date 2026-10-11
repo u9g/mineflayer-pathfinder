@@ -19,7 +19,8 @@ func emptySlots<K, V>(capacity int) List<Opt<Entry<K, V>>> {
   slots = List<Opt<Entry<K, V>>>();
   i = 0;
   while (i < capacity) {
-    slots.add(None<Entry<K, V>>());
+    empty Opt<Entry<K, V>> = None<Entry<K, V>>();
+    slots.add(^empty);
     set i = i + 1;
   }
   return ^slots;
@@ -69,7 +70,8 @@ where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) v
   if (self.slots.get(i).isEmpty()) {
     set self.size = self.size + 1;
   }
-  old = self.slots.set(i, Some(Entry<K, V>(^key, ^value)));
+  filled Opt<Entry<K, V>> = Some(Entry<K, V>(^key, ^value));
+  old = self.slots.set(i, ^filled);
   drop(^old);
 }
 

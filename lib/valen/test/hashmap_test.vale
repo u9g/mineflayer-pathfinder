@@ -1,0 +1,39 @@
+// Checks HashMap; main returns 0, or the number of the first failed check.
+// uses: list.vale hashmap.vale
+
+struct Pos {
+  x int;
+  y int;
+  z int;
+}
+
+func hash(self &Pos) int {
+  return (self.x * 31 + self.y) * 31 + self.z;
+}
+
+func ==(a &Pos, b &Pos) bool {
+  return a.x == b.x and a.y == b.y and a.z == b.z;
+}
+
+struct Node {
+  pos Pos;
+  cost float;
+}
+
+exported func main() int {
+  i = 0;
+  map = HashMap<Pos, int>();
+  set i = 0 - 500;
+  while (i < 500) {
+    map.put(Pos(i, i * 2, 7), clone(i));
+    set i = i + 1;
+  }
+  if (map.len() != 1000) { return 6; }
+  if (not map.has(&Pos(-250, -500, 7))) { return 7; }
+  if (map.has(&Pos(-250, -500, 8))) { return 8; }
+  if (map.get(&Pos(123, 246, 7)) != 123) { return 9; }
+  map.put(Pos(123, 246, 7), 5);
+  if (map.get(&Pos(123, 246, 7)) != 5) { return 10; }
+  if (map.len() != 1000) { return 11; }
+  return 0;
+}

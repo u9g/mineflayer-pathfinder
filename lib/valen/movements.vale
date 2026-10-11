@@ -44,7 +44,8 @@ struct Placement {
 }
 
 func Placement(x int, y int, z int, dx int, dy int, dz int) Placement {
-  return Placement(x, y, z, dx, dy, dz, false, false, None<Pos>());
+  noReturn Opt<Pos> = None<Pos>();
+  return Placement(x, y, z, dx, dy, dz, false, false, ^noReturn);
 }
 
 func sqrt2() float {
@@ -152,7 +153,8 @@ func getMoveJumpUp(self &World mut, node &Move, dirX int, dirZ int, neighbors &L
         if (not self.safeToBreak(&blockD)) { return void(); }
         toBreak.add(blockD.pos());
       }
-      toPlace.add(Placement(node.x, node.y - 1, node.z, dirX, 0, dirZ, false, false, Some(Pos(node.x, node.y, node.z))));
+      returnPos Opt<Pos> = Some(Pos(node.x, node.y, node.z));
+      toPlace.add(Placement(node.x, node.y - 1, node.z, dirX, 0, dirZ, false, false, ^returnPos));
       set cost = cost + self.settings.placeCost;
     }
 
@@ -207,7 +209,8 @@ func getMoveForward(self &World mut, node &Move, dirX int, dirZ int, neighbors &
 
   if (self.settings.canOpenDoors and blockC.openable and blockC.hasShapes) {
     // Open the fence gate: use the block there instead of placing one
-    toPlace.add(Placement(node.x + dirX, node.y, node.z + dirZ, 0, 0, 0, false, true, None<Pos>()));
+    noReturn Opt<Pos> = None<Pos>();
+    toPlace.add(Placement(node.x + dirX, node.y, node.z + dirZ, 0, 0, 0, false, true, ^noReturn));
   } else {
     set cost = cost + self.safeOrBreak(&blockC, &toBreak);
     if (cost > 100.0) { return void(); }
@@ -294,20 +297,25 @@ func getLandingBlock(self &World mut, node &Move, dirX int, dirZ int) Opt<Block>
   blockLand = self.near(node, dirX, -2, dirZ);
   while (blockLand.loaded and blockLand.y > self.settings.minY) {
     if (blockLand.liquid and blockLand.safe) {
-      return Some(^blockLand);
+      found Opt<Block> = Some(^blockLand);
+      return ^found;
     }
     if (blockLand.physical) {
       if (not (float(node.y - blockLand.y) > self.settings.maxDropDown)) {
-        return Some(self.near(&blockLand, 0, 1, 0));
+        above Opt<Block> = Some(self.near(&blockLand, 0, 1, 0));
+        return ^above;
       }
-      return None<Block>();
+      nothing Opt<Block> = None<Block>();
+      return ^nothing;
     }
     if (not blockLand.safe) {
-      return None<Block>();
+      nothing Opt<Block> = None<Block>();
+      return ^nothing;
     }
     set blockLand = self.near(&blockLand, 0, -1, 0);
   }
-  return None<Block>();
+  nothing Opt<Block> = None<Block>();
+  return ^nothing;
 }
 
 func getMoveDropDown(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
@@ -382,7 +390,8 @@ func getMoveUp(self &World mut, node &Move, neighbors &List<Move> mut) {
     block0 = self.near(node, 0, -1, 0);
     if (block0.physical and block0.height - float(node.y) < -0.2) { return void(); } // cannot jump-place from a half block
 
-    toPlace.add(Placement(node.x, node.y - 1, node.z, 0, 1, 0, true, false, None<Pos>()));
+    noReturn Opt<Pos> = None<Pos>();
+    toPlace.add(Placement(node.x, node.y - 1, node.z, 0, 1, 0, true, false, ^noReturn));
     set cost = cost + self.settings.placeCost;
   }
 
