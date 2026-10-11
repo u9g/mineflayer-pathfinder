@@ -106,7 +106,7 @@ func safeToBreak(self &World mut, target &Block) bool {
 
 // The cost of stepping into block, breaking it if it's in the way; 100 if it can't be broken
 func safeOrBreak(self &World mut, target &Block, toBreak &List<Pos> mut) float {
-  cost = float(self.entitiesNear(target, 0, 0, 0)) * self.settings.entityCost;
+  cost = float(&self.entitiesNear(target, 0, 0, 0)) * self.settings.entityCost;
   if (target.safe) {
     return cost;
   }
@@ -117,7 +117,7 @@ func safeOrBreak(self &World mut, target &Block, toBreak &List<Pos> mut) float {
 
   if (target.physical) {
     // An entity on top of the block will fall
-    set cost = cost + float(self.entitiesNear(target, 0, 1, 0)) * self.settings.entityCost;
+    set cost = cost + float(&self.entitiesNear(target, 0, 1, 0)) * self.settings.entityCost;
   }
   return cost + self.digCost(target);
 }
@@ -286,7 +286,7 @@ func getMoveDiagonal(self &World mut, node &Move, dirX int, dirZ int, neighbors 
     neighbors.add(Move(blockC.x, blockC.y, blockC.z, node.remainingBlocks, cost, ^toBreak));
   } else if (self.near(node, dirX, -2, dirZ).physical or blockD.liquid) {
     if (not blockD.safe) { return void(); } // don't self-immolate
-    set cost = cost + float(self.entitiesNear(&blockC, 0, -1, 0)) * self.settings.entityCost;
+    set cost = cost + float(&self.entitiesNear(&blockC, 0, -1, 0)) * self.settings.entityCost;
     neighbors.add(Move(blockC.x, blockC.y - 1, blockC.z, node.remainingBlocks, cost, ^toBreak));
   }
 }
@@ -301,7 +301,7 @@ func getLandingBlock(self &World mut, node &Move, dirX int, dirZ int) Opt<Block>
       return ^found;
     }
     if (blockLand.physical) {
-      if (not (float(node.y - blockLand.y) > self.settings.maxDropDown)) {
+      if (not (float(&(node.y - blockLand.y)) > self.settings.maxDropDown)) {
         above Opt<Block> = Some(self.near(&blockLand, 0, 1, 0));
         return ^above;
       }
@@ -330,7 +330,7 @@ func getMoveDropDown(self &World mut, node &Move, dirX int, dirZ int, neighbors 
   if (maybeLand.isEmpty()) { return void(); }
   blockLand = (^maybeLand).get();
   // Don't drop down into water
-  if (not self.settings.infiniteLiquidDropdownDistance and float(node.y - blockLand.y) > self.settings.maxDropDown) { return void(); }
+  if (not self.settings.infiniteLiquidDropdownDistance and float(&(node.y - blockLand.y)) > self.settings.maxDropDown) { return void(); }
 
   set cost = cost + self.safeOrBreak(&blockB, &toBreak);
   if (cost > 100.0) { return void(); }
@@ -341,7 +341,7 @@ func getMoveDropDown(self &World mut, node &Move, dirX int, dirZ int, neighbors 
 
   if (blockC.liquid) { return void(); } // dont go underwater
 
-  set cost = cost + float(self.entitiesNear(&blockLand, 0, 0, 0)) * self.settings.entityCost;
+  set cost = cost + float(&self.entitiesNear(&blockLand, 0, 0, 0)) * self.settings.entityCost;
 
   neighbors.add(Move(blockLand.x, blockLand.y, blockLand.z, node.remainingBlocks, cost, ^toBreak));
 }
@@ -361,7 +361,7 @@ func getMoveDown(self &World mut, node &Move, neighbors &List<Move> mut) {
 
   if (self.near(node, 0, 0, 0).liquid) { return void(); } // dont go underwater
 
-  set cost = cost + float(self.entitiesNear(&blockLand, 0, 0, 0)) * self.settings.entityCost;
+  set cost = cost + float(&self.entitiesNear(&blockLand, 0, 0, 0)) * self.settings.entityCost;
 
   neighbors.add(Move(blockLand.x, blockLand.y, blockLand.z, node.remainingBlocks, cost, ^toBreak));
 }
@@ -388,7 +388,7 @@ func getMoveUp(self &World mut, node &Move, neighbors &List<Move> mut) {
     }
 
     block0 = self.near(node, 0, -1, 0);
-    if (block0.physical and block0.height - float(node.y) < -0.2) { return void(); } // cannot jump-place from a half block
+    if (block0.physical and block0.height - float(&node.y) < -0.2) { return void(); } // cannot jump-place from a half block
 
     noReturn Opt<Pos> = None<Pos>();
     toPlace.add(Placement(node.x, node.y - 1, node.z, 0, 1, 0, true, false, ^noReturn));
@@ -415,7 +415,7 @@ func getMoveParkourForward(self &World mut, node &Move, dirX int, dirZ int, neig
   cost = 1.0;
 
   // Entities at the ceiling level along the path are left out: they rarely matter
-  set cost = cost + float(self.entitiesNear(node, dirX, 0, dirZ)) * self.settings.entityCost;
+  set cost = cost + float(&self.entitiesNear(node, dirX, 0, dirZ)) * self.settings.entityCost;
 
   // If we have a block on the ceiling, we cannot jump but we can still fall
   ceilingClear = self.near(node, 0, 2, 0).safe and self.near(node, dirX, 2, dirZ).safe;
@@ -435,7 +435,7 @@ func getMoveParkourForward(self &World mut, node &Move, dirX int, dirZ int, neig
     blockD = self.near(node, dx, -1, dz);
 
     if (blockC.safe) {
-      set cost = cost + float(self.entitiesNear(&blockC, 0, 0, 0)) * self.settings.entityCost;
+      set cost = cost + float(&self.entitiesNear(&blockC, 0, 0, 0)) * self.settings.entityCost;
     }
 
     if (ceilingClear and blockB.safe and blockC.safe and blockD.physical) {
@@ -446,7 +446,7 @@ func getMoveParkourForward(self &World mut, node &Move, dirX int, dirZ int, neig
       // Up
       if (blockA.safe and d != 4) { // 4 blocks forward and 1 up is very difficult and fails often
         if (blockC.height - block0.height > 1.2) { return void(); } // Too high to jump
-        set cost = cost + float(self.entitiesNear(&blockB, 0, 0, 0)) * self.settings.entityCost;
+        set cost = cost + float(&self.entitiesNear(&blockB, 0, 0, 0)) * self.settings.entityCost;
         neighbors.add(Move(blockB.x, blockB.y, blockB.z, node.remainingBlocks, cost, List<Pos>(), List<Placement>(), true));
         return void();
       }
@@ -454,7 +454,7 @@ func getMoveParkourForward(self &World mut, node &Move, dirX int, dirZ int, neig
       // Down
       blockE = self.near(node, dx, -2, dz);
       if (blockE.physical) {
-        set cost = cost + float(self.entitiesNear(&blockD, 0, 0, 0)) * self.settings.entityCost;
+        set cost = cost + float(&self.entitiesNear(&blockD, 0, 0, 0)) * self.settings.entityCost;
         neighbors.add(Move(blockD.x, blockD.y, blockD.z, node.remainingBlocks, cost, List<Pos>(), List<Placement>(), true));
       }
       set floorCleared = floorCleared and not blockE.physical;

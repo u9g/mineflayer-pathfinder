@@ -1,0 +1,12 @@
+// an Array<int> in main, as Valen's own tests use them, borrow checker off; main returns 0, or the number of the failed check.
+// uses: none
+// borrow-check: false
+
+exported func main() int {
+  a = Array<int>(4);
+  a.push(7);
+  a.push(9);
+  if (a[1] != 9) { return 1; }
+  if (a.len() != 2) { return 2; }
+  return 0;
+}
