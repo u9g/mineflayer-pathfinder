@@ -61,8 +61,8 @@ func siftUp(self &Heap mut, nodes &List<PathNode> mut, start int) {
   current = start;
   parent = current / 2;
   while (current > 1 and f(nodes, self.items.get(parent)) > f(nodes, self.items.get(current))) {
-    parentNode = self.items.get(parent);
-    currentNode = self.items.get(current);
+    parentNode = clone(self.items.get(parent));
+    currentNode = clone(self.items.get(current));
     self.place(nodes, parent, currentNode);
     self.place(nodes, current, parentNode);
     set current = parent;
@@ -71,7 +71,7 @@ func siftUp(self &Heap mut, nodes &List<PathNode> mut, start int) {
 }
 
 func pop(self &Heap mut, nodes &List<PathNode> mut) int {
-  smallest = self.items.get(1);
+  smallest = clone(self.items.get(1));
   last = self.items.pop();
   if (self.items.len() > 1) {
     self.place(nodes, 1, last);
@@ -82,7 +82,7 @@ func pop(self &Heap mut, nodes &List<PathNode> mut) int {
     return smallest;
   }
 
-  val = self.items.get(1);
+  val = clone(self.items.get(1));
   index = 1;
   smallerChild = 2;
   cost = f(nodes, val);
@@ -90,7 +90,7 @@ func pop(self &Heap mut, nodes &List<PathNode> mut) int {
     if (smallerChild < size and f(nodes, self.items.get(smallerChild)) > f(nodes, self.items.get(smallerChild + 1))) {
       set smallerChild = smallerChild + 1;
     }
-    smallerChildNode = self.items.get(smallerChild);
+    smallerChildNode = clone(self.items.get(smallerChild));
     if (not (cost > f(nodes, smallerChildNode))) {
       return smallest;
     }
@@ -157,7 +157,7 @@ func compute(self &Search mut) int {
     set self.closedCount = self.closedCount + 1;
     visitChunk(floorDiv(node.move.x, 16), floorDiv(node.move.z, 16));
 
-    g = node.g;
+    g = clone(node.g);
     neighbors = reversed(self.world.getNeighbors(&node.move));
     while (not neighbors.isEmpty()) {
       self.consider(current, g, neighbors.pop());
