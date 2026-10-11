@@ -17,7 +17,7 @@ extern func stateTop(state int) float; // the highest top of its shapes, at leas
 extern func stateDigCost(state int) float; // the labor cost of breaking it with the best tool
 extern func entitiesAt(x int, y int, z int) int;
 
-struct Pos {
+exported struct Pos {
   x int;
   y int;
   z int;
@@ -31,7 +31,7 @@ func ==(a &Pos, b &Pos) bool {
   return a.x == b.x and a.y == b.y and a.z == b.z;
 }
 
-struct BlockKind {
+exported struct BlockKind {
   climbable bool;
   safe bool;
   physical bool;
@@ -64,7 +64,7 @@ struct Block {
   height float;
 }
 
-struct Settings {
+exported struct Settings {
   canDig bool;
   placeCost float;
   liquidCost float;
@@ -81,7 +81,7 @@ struct Settings {
   minY int;
 }
 
-struct World {
+exported struct World {
   settings Settings;
   kinds HashMap<int, BlockKind>;
   digCosts HashMap<int, float>;

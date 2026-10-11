@@ -1,0 +1,38 @@
+// Every kind a Search reaches, exported so JS can hold a Search between ticks: an exported
+// struct's members have to be exported kinds too, all the way down.
+
+export List<PathNode> as NodeList;
+export []PathNode as NodeArray;
+export List<int> as IntList;
+export []int as IntArray;
+export List<Pos> as PosList;
+export []Pos as PosArray;
+export List<Placement> as PlacementList;
+export []Placement as PlacementArray;
+export Opt<Pos> as MaybePos;
+export Some<Pos> as SomePos;
+export None<Pos> as NoPos;
+
+export HashMap<int, BlockKind> as KindMap;
+export List<Opt<Entry<int, BlockKind>>> as KindSlots;
+export []Opt<Entry<int, BlockKind>> as KindSlotArray;
+export Opt<Entry<int, BlockKind>> as KindSlot;
+export Some<Entry<int, BlockKind>> as KindFullSlot;
+export None<Entry<int, BlockKind>> as KindEmptySlot;
+export Entry<int, BlockKind> as KindEntry;
+
+export HashMap<int, float> as CostMap;
+export List<Opt<Entry<int, float>>> as CostSlots;
+export []Opt<Entry<int, float>> as CostSlotArray;
+export Opt<Entry<int, float>> as CostSlot;
+export Some<Entry<int, float>> as CostFullSlot;
+export None<Entry<int, float>> as CostEmptySlot;
+export Entry<int, float> as CostEntry;
+
+export HashMap<Pos, int> as IndexMap;
+export List<Opt<Entry<Pos, int>>> as IndexSlots;
+export []Opt<Entry<Pos, int>> as IndexSlotArray;
+export Opt<Entry<Pos, int>> as IndexSlot;
+export Some<Entry<Pos, int>> as IndexFullSlot;
+export None<Entry<Pos, int>> as IndexEmptySlot;
+export Entry<Pos, int> as IndexEntry;

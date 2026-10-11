@@ -428,6 +428,28 @@ index 17ea6807..40835d3b 100644
  
    adjustCounterV(globalState, builder, globalState->metalCache->i32Type, sizePtrLE, 1, false);
  
+diff --git a/Backend/src/function/expressions/shared/ref.cpp b/Backend/src/function/expressions/shared/ref.cpp
+index ba04fe72..796129aa 100644
+--- a/Backend/src/function/expressions/shared/ref.cpp
++++ b/Backend/src/function/expressions/shared/ref.cpp
+@@ -37,7 +37,16 @@ LiveRef toLiveRef(WrapperPtrLE wrapperPtrLE) {
+ }
+ 
+ WrapperPtrLE toWrapperPtr(FunctionState* functionState, LLVMBuilderRef builder, KindStructs* kindStructs, Kind* refMT, LiveRef liveRef) {
+-  return kindStructs->makeWrapperPtr(FL(), functionState, builder, refMT, liveRef.refLE);
++  auto ptrLE = liveRef.refLE;
++  // A borrow points at the slot holding its referent. A runtime-sized array's value is already a
++  // pointer to its wrapper, so a borrow of one has to load that pointer out of the slot.
++  if (auto borrowRef = dynamic_cast<BorrowRef*>(refMT)) {
++    if (dynamic_cast<RuntimeSizedArrayT*>(peel_all_references(borrowRef->inner))) {
++      auto ptrLT = LLVMPointerTypeInContext(LLVMGetTypeContext(LLVMTypeOf(ptrLE)), 0);
++      ptrLE = LLVMBuildLoad2(builder, ptrLT, ptrLE, "rsaWrapperPtr");
++    }
++  }
++  return kindStructs->makeWrapperPtr(FL(), functionState, builder, refMT, ptrLE);
+ }
+ 
+ LiveRef toLiveRef(
 diff --git a/Backend/src/metal/ast.h b/Backend/src/metal/ast.h
 index 1c73af7c..98637f20 100644
 --- a/Backend/src/metal/ast.h

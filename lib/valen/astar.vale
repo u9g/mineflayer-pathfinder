@@ -7,7 +7,7 @@ extern func goalIsEnd(x int, y int, z int) bool;
 extern func now() float; // ms
 extern func visitChunk(chunkX int, chunkZ int);
 
-struct PathNode {
+exported struct PathNode {
   move Move;
   g float;
   h float;
@@ -19,7 +19,7 @@ struct PathNode {
 
 // The open set: heap.js's binary heap by f, with a dummy at index 0. It holds indices into
 // Search.nodes, and each node keeps its index here, so update needn't search for it.
-struct Heap {
+exported struct Heap {
   items List<int>;
 }
 

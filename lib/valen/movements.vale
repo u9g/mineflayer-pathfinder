@@ -3,7 +3,7 @@
 // Movements with any of them searches in JS instead (see lib/valenAStar.js).
 
 // A node of the search: a position and how the bot gets there from its parent
-struct Move {
+exported struct Move {
   x int;
   y int;
   z int;
@@ -31,7 +31,7 @@ func pos(self &Move) Pos {
 }
 
 // A block to place against the block at x, y, z on its dx, dy, dz face
-struct Placement {
+exported struct Placement {
   x int;
   y int;
   z int;
