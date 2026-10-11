@@ -90,7 +90,9 @@ jobs:
 
       - name: Build pathfinder.wasm
         if: ${{ !cancelled() }}
-        run: lib/valen/build.sh lib/valen/pathfinder.wasm "$(sed -n 's#^// exports: ##p' lib/valen/pathfinder.vale)"
+        run: |
+          exports=$(sed -n 's#^// exports: ##p' lib/valen/pathfinder.vale)
+          lib/valen/build.sh lib/valen/pathfinder.wasm "$exports"
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
