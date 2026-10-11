@@ -587,10 +587,36 @@ index e26e39f2..1172ec7c 100644
  
  PackageBuilderHandle* metal_package_builder_new(
 diff --git a/Backend/src/region/rcimm/rcimm.cpp b/Backend/src/region/rcimm/rcimm.cpp
-index 1c59587f..2d70611c 100644
+index 1c59587f..08d354a9 100644
 --- a/Backend/src/region/rcimm/rcimm.cpp
 +++ b/Backend/src/region/rcimm/rcimm.cpp
-@@ -854,7 +854,6 @@ LLVMTypeRef RCImm::translateType(Kind* referenceM) {
+@@ -70,9 +70,10 @@ void RCImm::alias(
+              dynamic_cast<StaticSizedArrayT *>(sourceRnd) ||
+              dynamic_cast<RuntimeSizedArrayT *>(sourceRnd) ||
+              dynamic_cast<Str *>(sourceRnd)) {
+-    assert(dynamic_cast<ShareRef*>(sourceRef) != nullptr);
++    // Strings are single-owned now, so they come owned or borrowed too, and get no RC either.
++    assert(dynamic_cast<ShareRef*>(sourceRef) != nullptr || dynamic_cast<Str*>(sourceRnd) != nullptr);
+     {
+-      if (dynamic_cast<ShareRef*>(sourceRef) != nullptr) {
++      if (dynamic_cast<ShareRef*>(sourceRef) != nullptr || dynamic_cast<Str*>(sourceRnd) != nullptr) {
+         // Do nothing, immutable yonders need no RC adjustments.
+       } else if (dynamic_cast<ShareRef*>(sourceRef) != nullptr) {
+         adjustStrongRc(from, globalState, functionState, &kindStructs, builder, ref, sourceRef, 1);
+@@ -806,9 +807,10 @@ void RCImm::discard(
+     if (auto sr = dynamic_cast<StructKind *>(sourceRnd)) {
+       buildFlare(FL(), globalState, functionState, builder, sr->fullName->name);
+     }
+-    assert(dynamic_cast<ShareRef*>(sourceMT) != nullptr);
++    // Strings are single-owned now, so they come owned or borrowed too, and get no RC either.
++    assert(dynamic_cast<ShareRef*>(sourceMT) != nullptr || dynamic_cast<Str*>(sourceRnd) != nullptr);
+     {
+-      if (dynamic_cast<ShareRef*>(sourceMT) != nullptr) {
++      if (dynamic_cast<ShareRef*>(sourceMT) != nullptr || dynamic_cast<Str*>(sourceRnd) != nullptr) {
+         // Do nothing, immutable yonders need no RC adjustments.
+       } else if (dynamic_cast<ShareRef*>(sourceMT) != nullptr) {
+         buildFlare(FL(), globalState, functionState, builder);
+@@ -854,7 +856,6 @@ LLVMTypeRef RCImm::translateType(Kind* referenceM) {
      // return primitives.translatePrimitive(globalState, referenceM);
    } else {
      if (dynamic_cast<Str *>(valueType) != nullptr) {
