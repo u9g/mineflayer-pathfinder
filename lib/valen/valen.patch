@@ -1,3 +1,33 @@
+diff --git a/Backend/src/function/expression.cpp b/Backend/src/function/expression.cpp
+index 7cbaf3d4..4e8054ad 100644
+--- a/Backend/src/function/expression.cpp
++++ b/Backend/src/function/expression.cpp
+@@ -703,9 +703,9 @@ Ref translateExpressionInner(
+         globalState->getRegion(arrayValueType)->loadElementFromRSA(
+             functionState, builder, arrayType, arrayKind, arrayLiveRef, indexInBoundsLE);
+     auto resultRef =
+-        globalState->getRegion(elementType)
++        globalState->getRegion(resultValueType)
+             ->upgradeLoadResultToRefWithTargetOwnership(
+-                functionState, builder, elementType, resultType, loadResult);
++                functionState, builder, globalState->metalCache->getBorrowRef(elementType), resultType, loadResult);
+ 
+     globalState->getRegion(resultValueType)
+         ->alias(FL(), functionState, builder, resultType, resultRef);
+diff --git a/Backend/src/function/expressions/externs.cpp b/Backend/src/function/expressions/externs.cpp
+index f8885afa..8a72cc4f 100644
+--- a/Backend/src/function/expressions/externs.cpp
++++ b/Backend/src/function/expressions/externs.cpp
+@@ -182,6 +182,9 @@ Ref buildCallOrSideCall(
+   }
+ 
+   auto externFuncIter = globalState->externFunctions.find(prototype->name->name);
++  if (externFuncIter == globalState->externFunctions.end()) {
++    std::cerr << "Calling extern " << prototype->name->name << ", which was never declared" << std::endl;
++  }
+   assert(externFuncIter != globalState->externFunctions.end());
+   auto externFuncL = externFuncIter->second;
+ 
 diff --git a/Backend/src/function/expressions/shared/elements.cpp b/Backend/src/function/expressions/shared/elements.cpp
 index 17ea6807..40835d3b 100644
 --- a/Backend/src/function/expressions/shared/elements.cpp
@@ -146,6 +176,28 @@ index 1c59587f..b1d0889f 100644
        return LLVMPointerType(kindStructs.getStringWrapperStruct(), 0);
      } else if (auto staticSizedArrayMT = dynamic_cast<StaticSizedArrayT *>(valueType)) {
        assert(dynamic_cast<ShareRef*>(referenceM) != nullptr);
+diff --git a/Backend/src/region/unsafe/unsafe.cpp b/Backend/src/region/unsafe/unsafe.cpp
+index 70fe617d..6d85c88b 100644
+--- a/Backend/src/region/unsafe/unsafe.cpp
++++ b/Backend/src/region/unsafe/unsafe.cpp
+@@ -595,8 +595,15 @@ LoadResult Unsafe::loadElementFromRSA(
+     LiveRef arrayRef,
+     InBoundsLE indexInBoundsLE) {
+   auto rsaDef = globalState->program->getRuntimeSizedArray(rsaMT);
+-  return regularLoadElementFromRSAWithoutUpgrade(
+-      globalState, functionState, builder, &kindStructs, true, rsaRefMT, rsaDef->elementType, arrayRef, indexInBoundsLE);
++  auto elementType = rsaDef->elementType;
++  auto arrayWrapperPtrLE = toWrapperPtr(functionState, builder, &kindStructs, rsaRefMT, arrayRef);
++  auto arrayElementsPtrLE = getRuntimeSizedArrayContentsPtr(builder, true, arrayWrapperPtrLE);
++  auto elementLT = globalState->getRegion(elementType)->translateType(elementType);
++  LLVMValueRef indices[2] = { constI32LE(globalState, 0), indexInBoundsLE.refLE };
++  auto elementPtrLE =
++      LLVMBuildInBoundsGEP2(builder, LLVMArrayType(elementLT, 0), arrayElementsPtrLE, indices, 2, "rsaElemPtr");
++  auto elementBorrowType = globalState->metalCache->getBorrowRef(elementType);
++  return LoadResult{toRef(globalState->getRegion(elementBorrowType), elementBorrowType, elementPtrLE)};
+ }
+ 
+ Ref Unsafe::storeElementInRSA(
 diff --git a/src/backend_ffi/metal_cache.rs b/src/backend_ffi/metal_cache.rs
 index 585ee6ef..b3df0cee 100644
 --- a/src/backend_ffi/metal_cache.rs
