@@ -46,6 +46,7 @@ chmod +x "$work/clang"
 # Valen's own HashMap tests are built the same way.
 set -- build \
   --no-std \
+  --opt-level "${VALEN_OPT_LEVEL:-O3}" \
   --borrow-check "${VALEN_BORROW_CHECK:-false}" \
   --builtins-dir-override "$VALEN_DIR/Backend/builtins" \
   --clang-override "$work/clang" \
