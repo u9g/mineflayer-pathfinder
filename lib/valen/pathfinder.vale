@@ -1,0 +1,82 @@
+// The pathfinder's entry points for lib/valenAStar.js. Only numbers and bools cross into Wasm:
+// a Search stays in Wasm, JS holds it by handle between ticks, and the path comes back through
+// the externs below one move at a time.
+// exports: newSearch,computeSearch,searchCost,visitedNodes,generatedNodes,reportPath,endSearch
+
+extern func pathMove(x int, y int, z int, remainingBlocks int, cost float, parkour bool);
+extern func pathBreak(x int, y int, z int);
+extern func pathPlace(
+  x int, y int, z int, dx int, dy int, dz int, jump bool, useOne bool,
+  hasReturnPos bool, returnX int, returnY int, returnZ int);
+
+exported func newSearch(
+  canDig bool, placeCost float, liquidCost float, entityCost float, dontCreateFlow bool,
+  dontMineUnderFallingBlock bool, allow1by1towers bool, allowParkour bool, allowSprinting bool,
+  allowEntityDetection bool, canOpenDoors bool, maxDropDown float,
+  infiniteLiquidDropdownDistance bool, minY int,
+  x int, y int, z int, remainingBlocks int, timeout float, tickTimeout float, searchRadius float
+) Search {
+  settings = Settings(
+    canDig, placeCost, liquidCost, entityCost, dontCreateFlow, dontMineUnderFallingBlock,
+    allow1by1towers, allowParkour, allowSprinting, allowEntityDetection, canOpenDoors,
+    maxDropDown, infiniteLiquidDropdownDistance, minY);
+  return Search(World(^settings), Move(x, y, z, remainingBlocks, 0.0), timeout, tickTimeout, searchRadius);
+}
+
+// Searches until done or out of time for this tick: 0 success, 1 partial, 2 timeout, 3 noPath
+exported func computeSearch(search &Search mut) int {
+  return search.compute();
+}
+
+exported func searchCost(search &Search) float {
+  return search.nodes.get(search.result).g;
+}
+
+exported func visitedNodes(search &Search) int {
+  return search.closedCount;
+}
+
+exported func generatedNodes(search &Search) int {
+  return search.closedCount + search.open.size();
+}
+
+// Reports the path to the node the last compute ended on, from the start's first move
+exported func reportPath(search &Search) {
+  backwards = List<int>();
+  i = search.result;
+  while (search.nodes.get(i).parent >= 0) {
+    backwards.add(i);
+    set i = search.nodes.get(i).parent;
+  }
+  while (not backwards.isEmpty()) {
+    move = &search.nodes.get(backwards.pop()).move;
+    pathMove(move.x, move.y, move.z, move.remainingBlocks, move.cost, move.parkour);
+    j = 0;
+    while (j < move.toBreak.len()) {
+      target = move.toBreak.get(j);
+      pathBreak(target.x, target.y, target.z);
+      set j = j + 1;
+    }
+    set j = 0;
+    while (j < move.toPlace.len()) {
+      p = move.toPlace.get(j);
+      if (p.returnPos.isEmpty()) {
+        pathPlace(p.x, p.y, p.z, p.dx, p.dy, p.dz, p.jump, p.useOne, false, 0, 0, 0);
+      } else {
+        r = p.returnPos.get();
+        pathPlace(p.x, p.y, p.z, p.dx, p.dy, p.dz, p.jump, p.useOne, true, r.x, r.y, r.z);
+      }
+      set j = j + 1;
+    }
+  }
+  drop(^backwards);
+}
+
+exported func endSearch(search Search) {
+  drop(^search);
+}
+
+// valec only builds programs; lib/valenAStar.js never calls this
+exported func main() int {
+  return 0;
+}

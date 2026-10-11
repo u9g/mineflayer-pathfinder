@@ -143,6 +143,10 @@ How many milliseconds per tick are allocated to thinking.
 The search limiting radius, in blocks, if `-1` the search is not limited by distance.
  * `Default` - `-1`
 
+### bot.pathfinder.useValen
+Search with the Valen build of the pathfinder (`lib/valen`, compiled to WebAssembly) instead of JavaScript. It finds the same paths. Searches whose movements have exclusion areas or are a `Movements` subclass, or when `lib/valen/pathfinder.wasm` isn't built, still run in JavaScript.
+ * `Default` - `true`
+
 # Human-like walking
 
 `createHuman(bot, options)` returns a controller that walks routes the way a player does. The pathfinder only plans the route; the controller then follows it by pure pursuit (corners become curves, the bot never snaps to block centres), turns the head in discrete mouse-like gestures on the 0.15° sensitivity grid, starts sprinting and sprint-jumping with human delays and rates, and coasts to a stop at the goal instead of braking on it. Reaction time, base pitch, glances and strafing are per-bot personality traits drawn from a seed. It walks, steps up single blocks and drops down; it does not dig, place, swim or parkour.

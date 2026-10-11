@@ -36,7 +36,7 @@ exported func main() int {
   if (last.pos.x != 99) { return 5; }
 
   map = HashMap<Pos, int>();
-  i = 0 - 500;
+  set i = 0 - 500;
   while (i < 500) {
     map.put(Pos(i, i * 2, 7), i);
     set i = i + 1;

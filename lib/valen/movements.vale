@@ -80,45 +80,45 @@ func cardinalMoves(self &World mut, node &Move, dirX int, dirZ int, neighbors &L
   }
 }
 
-func safeToBreak(self &World mut, block &Block) bool {
+func safeToBreak(self &World mut, target &Block) bool {
   if (not self.settings.canDig) {
     return false;
   }
 
   if (self.settings.dontCreateFlow) {
     // false if next to liquid
-    if (self.near(block, 0, 1, 0).liquid) { return false; }
-    if (self.near(block, -1, 0, 0).liquid) { return false; }
-    if (self.near(block, 1, 0, 0).liquid) { return false; }
-    if (self.near(block, 0, 0, -1).liquid) { return false; }
-    if (self.near(block, 0, 0, 1).liquid) { return false; }
+    if (self.near(target, 0, 1, 0).liquid) { return false; }
+    if (self.near(target, -1, 0, 0).liquid) { return false; }
+    if (self.near(target, 1, 0, 0).liquid) { return false; }
+    if (self.near(target, 0, 0, -1).liquid) { return false; }
+    if (self.near(target, 0, 0, 1).liquid) { return false; }
   }
 
   if (self.settings.dontMineUnderFallingBlock) {
-    if (self.near(block, 0, 1, 0).canFall or self.entitiesNear(block, 0, 1, 0) > 0) {
+    if (self.near(target, 0, 1, 0).canFall or self.entitiesNear(target, 0, 1, 0) > 0) {
       return false;
     }
   }
 
-  return block.breakable;
+  return target.breakable;
 }
 
 // The cost of stepping into block, breaking it if it's in the way; 100 if it can't be broken
-func safeOrBreak(self &World mut, block &Block, toBreak &List<Pos> mut) float {
-  cost = float(self.entitiesNear(block, 0, 0, 0)) * self.settings.entityCost;
-  if (block.safe) {
+func safeOrBreak(self &World mut, target &Block, toBreak &List<Pos> mut) float {
+  cost = float(self.entitiesNear(target, 0, 0, 0)) * self.settings.entityCost;
+  if (target.safe) {
     return cost;
   }
-  if (not self.safeToBreak(block)) {
+  if (not self.safeToBreak(target)) {
     return 100.0; // Can't break, so can't move
   }
-  toBreak.add(block.pos());
+  toBreak.add(target.pos());
 
-  if (block.physical) {
+  if (target.physical) {
     // An entity on top of the block will fall
-    set cost = cost + float(self.entitiesNear(block, 0, 1, 0)) * self.settings.entityCost;
+    set cost = cost + float(self.entitiesNear(target, 0, 1, 0)) * self.settings.entityCost;
   }
-  return cost + self.digCost(block);
+  return cost + self.digCost(target);
 }
 
 func getMoveJumpUp(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {

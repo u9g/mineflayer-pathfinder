@@ -1,6 +1,8 @@
 name: Valen
 
-# Builds the Valen compiler, then runs the Valen tests in lib/valen/test.
+# Builds the Valen compiler, runs the Valen tests in lib/valen/test, then builds the pathfinder
+# with it and tests that against the JS search and in the plugin. Each step after the compiler
+# runs even if an earlier one failed, so a run reports everything.
 
 on:
   workflow_dispatch:
@@ -79,8 +81,27 @@ jobs:
           key: ${{ steps.valec.outputs.cache-primary-key }}
 
       - uses: actions/setup-node@v4
+        if: ${{ !cancelled() }}
         with:
           node-version: 24
 
       - name: Valen tests
         run: lib/valen/test/run.sh
+
+      - name: Build pathfinder.wasm
+        if: ${{ !cancelled() }}
+        run: lib/valen/build.sh lib/valen/pathfinder.wasm "$(sed -n 's#^// exports: ##p' lib/valen/pathfinder.vale)"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: pathfinder-wasm
+          path: lib/valen/pathfinder.wasm
+
+      - run: npm install
+        if: ${{ !cancelled() }}
+
+      # The Valen search must match the JS one, and the plugin's own tests now search with it
+      - name: Parity and plugin tests
+        if: ${{ !cancelled() }}
+        run: npx mocha --exit test/valenAStarTest.js test/internalTest.js

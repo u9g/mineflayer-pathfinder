@@ -1,6 +1,7 @@
 const { performance } = require('perf_hooks')
 
 const AStar = require('./lib/astar')
+const ValenAStar = require('./lib/valenAStar')
 const Move = require('./lib/move')
 const Movements = require('./lib/movements')
 const gotoUtil = require('./lib/goto')
@@ -38,6 +39,7 @@ function inject (bot) {
   bot.pathfinder.thinkTimeout = 5000 // ms
   bot.pathfinder.tickTimeout = 40 // ms, amount of thinking per tick (max 50 ms)
   bot.pathfinder.searchRadius = -1 // in blocks, limits of the search area, -1: don't limit the search
+  bot.pathfinder.useValen = true // search with the Valen build (lib/valen) when it supports the movements
   bot.pathfinder.enablePathShortcut = false // disabled by default as it can cause bugs in specific configurations
   bot.pathfinder.LOSWhenPlacingBlocks = true
 
@@ -89,7 +91,8 @@ function inject (bot) {
       }
       movements.updateCollisionIndex()
     }
-    const astarContext = new AStar(start, movements, goal, timeout, tickTimeout, searchRadius)
+    const Search = bot.pathfinder.useValen && ValenAStar.supports(movements) ? ValenAStar : AStar
+    const astarContext = new Search(start, movements, goal, timeout, tickTimeout, searchRadius)
     let result = astarContext.compute()
     if (optimizePath) result.path = postProcessPath(result.path)
     yield { result, astarContext }

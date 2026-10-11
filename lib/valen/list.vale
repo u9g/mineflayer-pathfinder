@@ -25,12 +25,12 @@ func add<T>(self &List<T> mut, element T) {
 }
 
 func get<T>(self &List<T>, index int) &T {
-  return self.array[index];
+  return self.array[clone(index)];
 }
 
 // Replaces the element at index, returning the old one
 func set<T>(self &List<T> mut, index int, element T) T {
-  return set self.array[index] = ^element;
+  return set self.array[clone(index)] = ^element;
 }
 
 func pop<T>(self &List<T> mut) T {

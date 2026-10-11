@@ -118,18 +118,18 @@ func near(self &World mut, node &Move, dx int, dy int, dz int) Block {
 }
 
 // getBlock(block.position, dx, dy, dz), which gives a stub for a stub
-func near(self &World mut, block &Block, dx int, dy int, dz int) Block {
-  if (not block.loaded) {
+func near(self &World mut, target &Block, dx int, dy int, dz int) Block {
+  if (not target.loaded) {
     return Block(false, -1, 0, 0, 0, false, false, false, false, false, false, false, false, false, float(dy));
   }
-  return self.blockAt(block.x + dx, block.y + dy, block.z + dz, dy);
+  return self.blockAt(target.x + dx, target.y + dy, target.z + dz, dy);
 }
 
-func digCost(self &World mut, block &Block) float {
-  if (not self.digCosts.has(&block.state)) {
-    self.digCosts.put(block.state, stateDigCost(block.state));
+func digCost(self &World mut, target &Block) float {
+  if (not self.digCosts.has(&target.state)) {
+    self.digCosts.put(target.state, stateDigCost(target.state));
   }
-  return self.digCosts.get(&block.state);
+  return self.digCosts.get(&target.state);
 }
 
 // getNumEntitiesAt(node, dx, dy, dz)
@@ -141,11 +141,11 @@ func entitiesNear(self &World, node &Move, dx int, dy int, dz int) int {
 }
 
 // getNumEntitiesAt(block.position, dx, dy, dz), which is 0 for a stub
-func entitiesNear(self &World, block &Block, dx int, dy int, dz int) int {
-  if (not self.settings.allowEntityDetection or not block.loaded) {
+func entitiesNear(self &World, target &Block, dx int, dy int, dz int) int {
+  if (not self.settings.allowEntityDetection or not target.loaded) {
     return 0;
   }
-  return entitiesAt(block.x + dx, block.y + dy, block.z + dz);
+  return entitiesAt(target.x + dx, target.y + dy, target.z + dz);
 }
 
 func pos(self &Block) Pos {

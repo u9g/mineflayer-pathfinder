@@ -75,6 +75,8 @@ declare module 'mineflayer-pathfinder' {
 		thinkTimeout: number;
 		/** ms, amount of thinking per tick (max 50 ms) */
 		tickTimeout: number;
+		/** search with the Valen build (lib/valen) when it supports the movements; default true */
+		useValen: boolean;
 		readonly goal: goals.Goal | null;
 		readonly movements: Movements;
 

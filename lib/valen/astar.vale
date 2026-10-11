@@ -102,7 +102,7 @@ func pop(self &Heap mut, nodes &List<PathNode> mut) int {
   return smallest;
 }
 
-struct Search {
+exported struct Search {
   world World;
   nodes List<PathNode>;
   byPos HashMap<Pos, int>;
