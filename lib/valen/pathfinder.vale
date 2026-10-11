@@ -5,7 +5,7 @@
 // into a slot JS allocates, and JS passes that slot back as the box's borrow. (Valen can't yet
 // take an owned struct or array back from the host, so endSearch empties the box rather than
 // destroying it.)
-// exports: newSearch,computeSearch,searchCost,visitedNodes,generatedNodes,reportPath,endSearch,nodeCount,nodeG,nodeH,nodeF,nodeParent,nodeHeapIndex,nodeClosed,searchResult
+// exports: newSearch,computeSearch,searchCost,visitedNodes,generatedNodes,reportPath,endSearch,nodeCount,nodeG,nodeH,nodeF,nodeParent,nodeHeapIndex,nodeClosed,searchResult,neighborsOf
 
 extern func pathMove(x int, y int, z int, remainingBlocks int, cost float, parkour bool);
 extern func pathBreak(x int, y int, z int);
@@ -58,28 +58,42 @@ exported func reportPath(box &[]Search) {
     set i = search.nodes.get(i).parent;
   }
   while (not backwards.isEmpty()) {
-    move = &search.nodes.get(backwards.pop()).move;
-    pathMove(move.x, move.y, move.z, move.remainingBlocks, move.cost, move.parkour);
-    j = 0;
-    while (j < move.toBreak.len()) {
-      target = move.toBreak.get(j);
-      pathBreak(target.x, target.y, target.z);
-      set j = j + 1;
-    }
-    set j = 0;
-    while (j < move.toPlace.len()) {
-      p = move.toPlace.get(j);
-      pathPlace(
-        p.x, p.y, p.z, p.dx, p.dy, p.dz, p.jump, p.useOne,
-        p.hasReturnPos, p.returnPos.x, p.returnPos.y, p.returnPos.z);
-      set j = j + 1;
-    }
+    reportMove(&search.nodes.get(backwards.pop()).move);
   }
   drop(^backwards);
 }
 
 exported func endSearch(box &[]Search mut) {
   drop(box.pop());
+}
+
+func reportMove(move &Move) {
+  pathMove(move.x, move.y, move.z, move.remainingBlocks, move.cost, move.parkour);
+  j = 0;
+  while (j < move.toBreak.len()) {
+    target = move.toBreak.get(j);
+    pathBreak(target.x, target.y, target.z);
+    set j = j + 1;
+  }
+  set j = 0;
+  while (j < move.toPlace.len()) {
+    p = move.toPlace.get(j);
+    pathPlace(
+      p.x, p.y, p.z, p.dx, p.dy, p.dz, p.jump, p.useOne,
+      p.hasReturnPos, p.returnPos.x, p.returnPos.y, p.returnPos.z);
+    set j = j + 1;
+  }
+}
+
+// For tests: reports the moves getNeighbors finds from a node, like reportPath
+exported func neighborsOf(box &[]Search mut, x int, y int, z int, remainingBlocks int) {
+  node = Move(x, y, z, remainingBlocks, 0.0);
+  neighbors = box[0].world.getNeighbors(&node);
+  i = 0;
+  while (i < neighbors.len()) {
+    reportMove(neighbors.get(i));
+    set i = i + 1;
+  }
 }
 
 // For tests: a search's nodes, by index
