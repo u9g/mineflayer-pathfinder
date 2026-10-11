@@ -191,6 +191,7 @@ func consider(self &Search mut, from int, fromG float, neighbor Move) {
     self.noteBest(index);
     self.open.push(&self.nodes, index);
   } else {
+    drop(^key); // already indexed
     node = self.nodes.get(existing);
     if (node.g < gFromThisNode) {
       return void(); // skip this one because another route is faster

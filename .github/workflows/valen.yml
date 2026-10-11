@@ -94,6 +94,14 @@ jobs:
 
       - name: Valen tests
         run: lib/valen/test/run.sh
+        env:
+          VALEN_TEST_OUT: ${{ github.workspace }}/valen-test-out
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: valen-test-modules
+          path: valen-test-out/*.wasm
 
       - name: Build pathfinder.wasm
         if: ${{ !cancelled() }}

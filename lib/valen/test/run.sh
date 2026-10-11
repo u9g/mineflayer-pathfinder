@@ -7,7 +7,8 @@
 # "// borrow-check: true" line builds it with the borrow checker.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-out=$(mktemp -d)
+out=${VALEN_TEST_OUT:-$(mktemp -d)}
+mkdir -p "$out"
 failed=0
 for test in "$here"/*.vale; do
   name=$(basename "$test" .vale)
