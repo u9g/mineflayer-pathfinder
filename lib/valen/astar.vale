@@ -1,0 +1,217 @@
+// A* over the moves in movements.vale: lib/astar.js and lib/heap.js, step for step, so it
+// expands nodes in the same order and finds the same path.
+
+// The goal and the clock, provided by lib/valenAStar.js
+extern func goalHeuristic(x int, y int, z int) float;
+extern func goalIsEnd(x int, y int, z int) bool;
+extern func now() float; // ms
+extern func visitChunk(chunkX int, chunkZ int);
+
+struct PathNode {
+  move Move;
+  g float;
+  h float;
+  f float;
+  parent int; // index in Search.nodes, -1 for the start
+  closed bool;
+  heapIndex int;
+}
+
+// The open set: heap.js's binary heap by f, with a dummy at index 0. It holds indices into
+// Search.nodes, and each node keeps its index here, so update needn't search for it.
+struct Heap {
+  items List<int>;
+}
+
+func Heap() Heap {
+  items = List<int>();
+  items.add(-1);
+  return Heap(^items);
+}
+
+func size(self &Heap) int {
+  return self.items.len() - 1;
+}
+
+func isEmpty(self &Heap) bool {
+  return self.items.len() == 1;
+}
+
+func f(nodes &List<PathNode>, index int) float {
+  return nodes.get(index).f;
+}
+
+func place(self &Heap mut, nodes &List<PathNode> mut, at int, node int) {
+  self.items.set(at, node);
+  set nodes.get(node).heapIndex = at;
+}
+
+func push(self &Heap mut, nodes &List<PathNode> mut, node int) {
+  self.items.add(node);
+  set nodes.get(node).heapIndex = self.items.len() - 1;
+  self.siftUp(nodes, self.items.len() - 1);
+}
+
+func update(self &Heap mut, nodes &List<PathNode> mut, node int) {
+  self.siftUp(nodes, nodes.get(node).heapIndex);
+}
+
+// Moves the node at current up until its parent's f is no greater
+func siftUp(self &Heap mut, nodes &List<PathNode> mut, start int) {
+  current = start;
+  parent = current / 2;
+  while (current > 1 and f(nodes, self.items.get(parent)) > f(nodes, self.items.get(current))) {
+    parentNode = self.items.get(parent);
+    currentNode = self.items.get(current);
+    self.place(nodes, parent, currentNode);
+    self.place(nodes, current, parentNode);
+    set current = parent;
+    set parent = current / 2;
+  }
+}
+
+func pop(self &Heap mut, nodes &List<PathNode> mut) int {
+  smallest = self.items.get(1);
+  last = self.items.pop();
+  if (self.items.len() > 1) {
+    self.place(nodes, 1, last);
+  }
+
+  size = self.items.len() - 1;
+  if (size < 2) {
+    return smallest;
+  }
+
+  val = self.items.get(1);
+  index = 1;
+  smallerChild = 2;
+  cost = f(nodes, val);
+  while (smallerChild <= size) {
+    if (smallerChild < size and f(nodes, self.items.get(smallerChild)) > f(nodes, self.items.get(smallerChild + 1))) {
+      set smallerChild = smallerChild + 1;
+    }
+    smallerChildNode = self.items.get(smallerChild);
+    if (not (cost > f(nodes, smallerChildNode))) {
+      return smallest;
+    }
+    self.place(nodes, index, smallerChildNode);
+    self.place(nodes, smallerChild, val);
+    set index = smallerChild;
+    set smallerChild = smallerChild * 2;
+  }
+  return smallest;
+}
+
+struct Search {
+  world World;
+  nodes List<PathNode>;
+  byPos HashMap<Pos, int>;
+  open Heap;
+  best int;
+  maxCost float;
+  closedCount int;
+  startTime float;
+  timeout float;
+  tickTimeout float;
+  result int; // the node the last compute ended on
+}
+
+func Search(world World, start Move, timeout float, tickTimeout float, searchRadius float) Search {
+  startPos = start.pos();
+  h = goalHeuristic(start.x, start.y, start.z);
+  maxCost = if (searchRadius < 0.0) { -1.0 } else { h + searchRadius };
+  search = Search(
+    ^world, List<PathNode>(), HashMap<Pos, int>(), Heap(), 0, maxCost, 0, now(), timeout,
+    tickTimeout, 0);
+  search.nodes.add(PathNode(^start, 0.0, h, h, -1, false, -1));
+  search.byPos.put(^startPos, 0);
+  search.open.push(&search.nodes, 0);
+  return ^search;
+}
+
+// What compute found, as astar.js's result statuses
+func success() int { return 0; }
+func partial() int { return 1; }
+func timedOut() int { return 2; }
+func noPath() int { return 3; }
+
+func compute(self &Search mut) int {
+  computeStartTime = now();
+  while (not self.open.isEmpty()) {
+    if (now() - computeStartTime > self.tickTimeout) { // compute time per tick
+      set self.result = self.best;
+      return partial();
+    }
+    if (now() - self.startTime > self.timeout) { // total compute time
+      set self.result = self.best;
+      return timedOut();
+    }
+    current = self.open.pop(&self.nodes);
+    node = self.nodes.get(current);
+    if (goalIsEnd(node.move.x, node.move.y, node.move.z)) {
+      set self.result = current;
+      return success();
+    }
+    // not done yet
+    set node.closed = true;
+    set self.closedCount = self.closedCount + 1;
+    visitChunk(floorDiv(node.move.x, 16), floorDiv(node.move.z, 16));
+
+    g = node.g;
+    neighbors = reversed(self.world.getNeighbors(&node.move));
+    while (not neighbors.isEmpty()) {
+      self.consider(current, g, neighbors.pop());
+    }
+    drop(^neighbors);
+  }
+  // all the neighbors of every accessible node have been exhausted
+  set self.result = self.best;
+  return noPath();
+}
+
+// Adds the route to neighbor through the node at from, if it's new or better
+func consider(self &Search mut, from int, fromG float, neighbor Move) {
+  key = neighbor.pos();
+  existing = if (self.byPos.has(&key)) { self.byPos.get(&key) } else { -1 };
+  if (existing >= 0 and self.nodes.get(existing).closed) {
+    return; // skip closed neighbors
+  }
+  gFromThisNode = fromG + neighbor.cost;
+
+  heuristic = goalHeuristic(neighbor.x, neighbor.y, neighbor.z);
+  if (self.maxCost > 0.0 and gFromThisNode + heuristic > self.maxCost) {
+    return;
+  }
+
+  if (existing < 0) {
+    // add neighbor to the open set
+    index = self.nodes.len();
+    self.nodes.add(PathNode(^neighbor, gFromThisNode, heuristic, gFromThisNode + heuristic, from, false, -1));
+    self.byPos.put(^key, index);
+    self.noteBest(index);
+    self.open.push(&self.nodes, index);
+  } else {
+    node = self.nodes.get(existing);
+    if (node.g < gFromThisNode) {
+      return; // skip this one because another route is faster
+    }
+    // found a better route: update this neighbor with this node as its new parent
+    drop(set node.move = ^neighbor);
+    set node.g = gFromThisNode;
+    set node.h = heuristic;
+    set node.f = gFromThisNode + heuristic;
+    set node.parent = from;
+    self.noteBest(existing);
+    self.open.update(&self.nodes, existing);
+  }
+}
+
+func noteBest(self &Search mut, index int) {
+  if (self.nodes.get(index).h < self.nodes.get(self.best).h) {
+    set self.best = index;
+  }
+}
+
+func floorDiv(a int, b int) int {
+  return (a - floorMod(a, b)) / b;
+}

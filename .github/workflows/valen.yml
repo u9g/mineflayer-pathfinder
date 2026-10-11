@@ -62,13 +62,21 @@ jobs:
         with:
           toolchain: ${{ env.RUST_NIGHTLY }}
 
-      - uses: actions/cache@v4
+      # Restore and save separately, so a failing test still keeps the built compiler
+      - uses: actions/cache/restore@v4
+        id: valec
         with:
           path: valen/target
           key: valec-${{ env.VALEN_REF }}-${{ env.RUST_NIGHTLY }}-${{ hashFiles('lib/valen/valen-libstdcxx.patch') }}
 
       - name: Build valec
         run: cargo build --manifest-path valen/Cargo.toml --bin valec
+
+      - uses: actions/cache/save@v4
+        if: steps.valec.outputs.cache-hit != 'true'
+        with:
+          path: valen/target
+          key: ${{ steps.valec.outputs.cache-primary-key }}
 
       - uses: actions/setup-node@v4
         with:

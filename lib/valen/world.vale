@@ -92,15 +92,15 @@ func hash(self &int) int {
 }
 
 func World(settings Settings) World {
-  return World(settings, HashMap<int, BlockKind>(), HashMap<int, float>());
+  return World(^settings, HashMap<int, BlockKind>(), HashMap<int, float>());
 }
 
 func blockAt(self &World mut, x int, y int, z int, dy int) Block {
   state = blockStateAt(x, y, z);
-  if state < 0 {
+  if (state < 0) {
     return Block(false, state, x, y, z, false, false, false, false, false, false, false, false, false, float(dy));
   }
-  if not self.kinds.has(&state) {
+  if (not self.kinds.has(&state)) {
     self.kinds.put(state, BlockKind(
       stateClimbable(state), stateSafe(state), statePhysical(state), stateReplaceable(state),
       stateLiquid(state), stateCanFall(state), stateOpenable(state), stateHasShapes(state),
@@ -119,14 +119,14 @@ func near(self &World mut, node &Move, dx int, dy int, dz int) Block {
 
 // getBlock(block.position, dx, dy, dz), which gives a stub for a stub
 func near(self &World mut, block &Block, dx int, dy int, dz int) Block {
-  if not block.loaded {
+  if (not block.loaded) {
     return Block(false, -1, 0, 0, 0, false, false, false, false, false, false, false, false, false, float(dy));
   }
   return self.blockAt(block.x + dx, block.y + dy, block.z + dz, dy);
 }
 
 func digCost(self &World mut, block &Block) float {
-  if not self.digCosts.has(&block.state) {
+  if (not self.digCosts.has(&block.state)) {
     self.digCosts.put(block.state, stateDigCost(block.state));
   }
   return self.digCosts.get(&block.state);
@@ -134,7 +134,7 @@ func digCost(self &World mut, block &Block) float {
 
 // getNumEntitiesAt(node, dx, dy, dz)
 func entitiesNear(self &World, node &Move, dx int, dy int, dz int) int {
-  if not self.settings.allowEntityDetection {
+  if (not self.settings.allowEntityDetection) {
     return 0;
   }
   return entitiesAt(node.x + dx, node.y + dy, node.z + dz);
@@ -142,7 +142,7 @@ func entitiesNear(self &World, node &Move, dx int, dy int, dz int) int {
 
 // getNumEntitiesAt(block.position, dx, dy, dz), which is 0 for a stub
 func entitiesNear(self &World, block &Block, dx int, dy int, dz int) int {
-  if not self.settings.allowEntityDetection or not block.loaded {
+  if (not self.settings.allowEntityDetection or not block.loaded) {
     return 0;
   }
   return entitiesAt(block.x + dx, block.y + dy, block.z + dz);

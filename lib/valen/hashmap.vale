@@ -18,11 +18,11 @@ func HashMap<K, V>() HashMap<K, V> {
 func emptySlots<K, V>(capacity int) List<Opt<Entry<K, V>>> {
   slots = List<Opt<Entry<K, V>>>();
   i = 0;
-  while i < capacity {
+  while (i < capacity) {
     slots.add(None<Entry<K, V>>());
     set i = i + 1;
   }
-  return slots;
+  return ^slots;
 }
 
 func len<K, V>(self &HashMap<K, V>) int {
@@ -34,17 +34,17 @@ func slotOf<K, V>(self &HashMap<K, V>, key &K) int
 where func hash(&K) int, func ==(&K, &K) bool {
   capacity = self.slots.len();
   i = floorMod(hash(key), capacity);
-  while true {
+  while (true) {
     slot = self.slots.get(i);
-    if slot.isEmpty() {
+    if (slot.isEmpty()) {
       return i;
     }
-    if slot.get().key == key {
+    if (slot.get().key == key) {
       return i;
     }
     set i = floorMod(i + 1, capacity);
   }
-  return -1;
+  return 0 - 1;
 }
 
 func has<K, V>(self &HashMap<K, V>, key &K) bool
@@ -62,30 +62,35 @@ where func hash(&K) int, func ==(&K, &K) bool {
 func put<K, V>(self &HashMap<K, V> mut, key K, value V)
 where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) void {
   // Keep at most half the slots full, so probes stay short
-  if (self.size + 1) * 2 > self.slots.len() {
+  if ((self.size + 1) * 2 > self.slots.len()) {
     self.grow();
   }
   i = self.slotOf(&key);
-  if self.slots.get(i).isEmpty() {
+  if (self.slots.get(i).isEmpty()) {
     set self.size = self.size + 1;
   }
-  self.slots.set(i, Some(Entry<K, V>(key, value)));
+  old = self.slots.set(i, Some(Entry<K, V>(^key, ^value)));
+  drop(^old);
 }
 
 func grow<K, V>(self &HashMap<K, V> mut)
 where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) void {
   old = set self.slots = emptySlots<K, V>(self.slots.len() * 2);
   set self.size = 0;
-  while not old.isEmpty() {
+  while (not old.isEmpty()) {
     slot = old.pop();
-    if not slot.isEmpty() {
-      [key, value] = slot.get();
-      self.put(key, value);
+    if (slot.isEmpty()) {
+      drop(^slot);
+    } else {
+      [key, value] = (^slot).get();
+      self.put(^key, ^value);
     }
   }
+  [array] = ^old;
+  [] = ^array;
 }
 
 func floorMod(a int, b int) int {
   m = mod(a, b);
-  return if m < 0 { m + b } else { m };
+  return if (m < 0) { m + b } else { m };
 }

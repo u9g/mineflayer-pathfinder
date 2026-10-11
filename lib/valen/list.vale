@@ -18,10 +18,10 @@ func isEmpty<T>(self &List<T>) bool {
 }
 
 func add<T>(self &List<T> mut, element T) {
-  if self.array.len() == self.array.capacity() {
+  if (self.array.len() == self.array.capacity()) {
     self.grow();
   }
-  self.array.push(element);
+  self.array.push(^element);
 }
 
 func get<T>(self &List<T>, index int) &T {
@@ -30,7 +30,7 @@ func get<T>(self &List<T>, index int) &T {
 
 // Replaces the element at index, returning the old one
 func set<T>(self &List<T> mut, index int, element T) T {
-  return set self.array[index] = element;
+  return set self.array[index] = ^element;
 }
 
 func pop<T>(self &List<T> mut) T {
@@ -41,31 +41,33 @@ func grow<T>(self &List<T> mut) {
   old = set self.array = Array<T>(self.array.capacity() * 2);
   // Popping reverses the order, so go through a second array to restore it
   reversed = Array<T>(old.len());
-  while old.len() > 0 {
+  while (old.len() > 0) {
     reversed.push(old.pop());
   }
-  while reversed.len() > 0 {
+  while (reversed.len() > 0) {
     self.array.push(reversed.pop());
   }
-  [] = old;
-  [] = reversed;
+  [] = ^old;
+  [] = ^reversed;
 }
 
 // Moves every element of other onto the end of this list, in order
 func addAll<T>(self &List<T> mut, other List<T>) {
-  reversed = other.reversed();
-  while not reversed.isEmpty() {
+  reversed = reversed(^other);
+  while (not reversed.isEmpty()) {
     self.add(reversed.pop());
   }
-  drop(reversed);
+  [array] = ^reversed;
+  [] = ^array;
 }
 
 // The same elements in the opposite order, so popping them goes from first to last
-func reversed<T>(self List<T>) List<T> {
+func reversed<T>(list List<T>) List<T> {
   result = List<T>();
-  while not self.isEmpty() {
-    result.add(self.pop());
+  while (not list.isEmpty()) {
+    result.add(list.pop());
   }
-  drop(self);
-  return result;
+  [array] = ^list;
+  [] = ^array;
+  return ^result;
 }
