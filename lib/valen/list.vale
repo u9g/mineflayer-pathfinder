@@ -1,0 +1,52 @@
+// A growable list that owns its elements. Valen's stdlib List grows with migrate, which isn't
+// implemented yet, so this one moves its elements into a bigger array by hand.
+
+struct List<T> {
+  array []T;
+}
+
+func List<T>() List<T> {
+  return List<T>(Array<T>(8));
+}
+
+func len<T>(self &List<T>) int {
+  return self.array.len();
+}
+
+func isEmpty<T>(self &List<T>) bool {
+  return self.array.len() == 0;
+}
+
+func add<T>(self &List<T> mut, element T) {
+  if self.array.len() == self.array.capacity() {
+    self.grow();
+  }
+  self.array.push(element);
+}
+
+func get<T>(self &List<T>, index int) &T {
+  return self.array[index];
+}
+
+// Replaces the element at index, returning the old one
+func set<T>(self &List<T> mut, index int, element T) T {
+  return set self.array[index] = element;
+}
+
+func pop<T>(self &List<T> mut) T {
+  return self.array.pop();
+}
+
+func grow<T>(self &List<T> mut) {
+  old = set self.array = Array<T>(self.array.capacity() * 2);
+  // Popping reverses the order, so go through a second array to restore it
+  reversed = Array<T>(old.len());
+  while old.len() > 0 {
+    reversed.push(old.pop());
+  }
+  while reversed.len() > 0 {
+    self.array.push(reversed.pop());
+  }
+  [] = old;
+  [] = reversed;
+}

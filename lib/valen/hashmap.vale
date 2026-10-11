@@ -1,0 +1,91 @@
+// A hash map with open addressing and linear probing. Keys need hash and ==. There's no
+// removal, which the pathfinder doesn't need, so a slot once filled stays filled.
+
+struct HashMap<K, V> {
+  slots List<Opt<Entry<K, V>>>;
+  size int;
+}
+
+struct Entry<K, V> {
+  key K;
+  value V;
+}
+
+func HashMap<K, V>() HashMap<K, V> {
+  return HashMap<K, V>(emptySlots<K, V>(16), 0);
+}
+
+func emptySlots<K, V>(capacity int) List<Opt<Entry<K, V>>> {
+  slots = List<Opt<Entry<K, V>>>();
+  i = 0;
+  while i < capacity {
+    slots.add(None<Entry<K, V>>());
+    set i = i + 1;
+  }
+  return slots;
+}
+
+func len<K, V>(self &HashMap<K, V>) int {
+  return self.size;
+}
+
+// The slot holding key, or the empty slot where it would go
+func slotOf<K, V>(self &HashMap<K, V>, key &K) int
+where func hash(&K) int, func ==(&K, &K) bool {
+  capacity = self.slots.len();
+  i = floorMod(hash(key), capacity);
+  while true {
+    slot = self.slots.get(i);
+    if slot.isEmpty() {
+      return i;
+    }
+    if slot.get().key == key {
+      return i;
+    }
+    set i = floorMod(i + 1, capacity);
+  }
+  return -1;
+}
+
+func has<K, V>(self &HashMap<K, V>, key &K) bool
+where func hash(&K) int, func ==(&K, &K) bool {
+  return not self.slots.get(self.slotOf(key)).isEmpty();
+}
+
+// The value for key; panics if there is none, so check has first
+func get<K, V>(self &HashMap<K, V>, key &K) &V
+where func hash(&K) int, func ==(&K, &K) bool {
+  return &self.slots.get(self.slotOf(key)).get().value;
+}
+
+// Adds key, or replaces its value
+func put<K, V>(self &HashMap<K, V> mut, key K, value V)
+where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) void {
+  // Keep at most half the slots full, so probes stay short
+  if (self.size + 1) * 2 > self.slots.len() {
+    self.grow();
+  }
+  i = self.slotOf(&key);
+  if self.slots.get(i).isEmpty() {
+    set self.size = self.size + 1;
+  }
+  self.slots.set(i, Some(Entry<K, V>(key, value)));
+}
+
+func grow<K, V>(self &HashMap<K, V> mut)
+where func hash(&K) int, func ==(&K, &K) bool, func drop(K) void, func drop(V) void {
+  old = set self.slots = emptySlots<K, V>(self.slots.len() * 2);
+  set self.size = 0;
+  while not old.isEmpty() {
+    slot = old.pop();
+    if not slot.isEmpty() {
+      [key, value] = slot.get();
+      self.put(key, value);
+    }
+  }
+}
+
+func floorMod(a int, b int) int {
+  m = mod(a, b);
+  return if m < 0 { m + b } else { m };
+}

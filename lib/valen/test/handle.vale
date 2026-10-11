@@ -1,0 +1,29 @@
+// Can JS hold a Valen object between calls? Built as a reactor; handle.js drives it.
+// exports: newSearch,step,total
+
+struct Counter {
+  count int;
+  history List<int>;
+}
+
+exported struct Search {
+  counter Counter;
+}
+
+exported func newSearch(start int) Search {
+  return Search(Counter(start, List<int>()));
+}
+
+exported func step(self &Search) int {
+  set self.counter.count = self.counter.count + 1;
+  self.counter.history.add(self.counter.count);
+  return self.counter.history.len();
+}
+
+exported func total(self &Search) int {
+  return self.counter.count;
+}
+
+exported func main() int {
+  return 0;
+}

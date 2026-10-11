@@ -1,0 +1,78 @@
+name: Valen
+
+# Builds the Valen compiler, then runs the Valen tests in lib/valen/test.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'lib/valen/**'
+      - 'lib/valen*.js'
+      - 'test/valen*'
+      - '.github/workflows/valen.yml'
+  pull_request:
+    paths:
+      - 'lib/valen/**'
+      - 'lib/valen*.js'
+      - 'test/valen*'
+      - '.github/workflows/valen.yml'
+
+env:
+  VALEN_REF: 7cf925b1cc715e2a60c71e635412c17ef11a15ad
+  RUST_NIGHTLY: nightly-2026-07-01
+  VALEN_DIR: ${{ github.workspace }}/valen
+  WASI_SDK_PATH: ${{ github.workspace }}/wasi-sdk
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out Valen
+        uses: actions/checkout@v4
+        with:
+          repository: valen-lang/valen
+          ref: ${{ env.VALEN_REF }}
+          path: valen
+
+      # Valen's backend keeps unordered_maps of types it only forward-declares, which macOS's libc++
+      # accepts and Linux's libstdc++ rejects. Remove once Valen defines them first.
+      - name: Patch Valen for libstdc++
+        run: git -C valen apply "$GITHUB_WORKSPACE/lib/valen/valen-libstdcxx.patch"
+
+      - name: Install LLVM 21
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-21 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y llvm-21 llvm-21-dev clang-21 libpolly-21-dev cmake build-essential zlib1g-dev libzstd-dev libcurl4-openssl-dev
+          echo "LLVM_CONFIG=/usr/bin/llvm-config-21" >> $GITHUB_ENV
+
+      - name: Install wasi-sdk and wasmtime
+        run: |
+          mkdir -p "$WASI_SDK_PATH"
+          curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.tar.gz \
+            | tar -xz -C "$WASI_SDK_PATH" --strip-components=1
+          curl -sSf https://wasmtime.dev/install.sh | bash
+          echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+
+      # Valen uses #![feature(box_patterns)], which nightly removed in 1.100
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_NIGHTLY }}
+
+      - uses: actions/cache@v4
+        with:
+          path: valen/target
+          key: valec-${{ env.VALEN_REF }}-${{ env.RUST_NIGHTLY }}-${{ hashFiles('lib/valen/valen-libstdcxx.patch') }}
+
+      - name: Build valec
+        run: cargo build --manifest-path valen/Cargo.toml --bin valec
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Valen tests
+        run: lib/valen/test/run.sh
