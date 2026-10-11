@@ -58,7 +58,7 @@ func update(self &Heap mut, nodes &List<PathNode> mut, node int) {
 
 // Moves the node at current up until its parent's f is no greater
 func siftUp(self &Heap mut, nodes &List<PathNode> mut, start int) {
-  current = start;
+  current = clone(start);
   parent = current / 2;
   while (current > 1 and f(nodes, self.items.get(parent)) > f(nodes, self.items.get(current))) {
     parentNode = clone(self.items.get(parent));
