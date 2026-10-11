@@ -47,6 +47,7 @@ chmod +x "$work/clang"
 set -- build \
   --no-std \
   --opt-level "${VALEN_OPT_LEVEL:-O3}" \
+  ${VALEN_LLVM_IR:+--llvm-ir} \
   --borrow-check "${VALEN_BORROW_CHECK:-false}" \
   --builtins-dir-override "$VALEN_DIR/Backend/builtins" \
   --clang-override "$work/clang" \
@@ -65,5 +66,7 @@ fi
 if [ $code -ne 0 ]; then exit $code; fi
 
 cp "$work/build/out.wasm" "$wasm"
+# VALEN_LLVM_IR keeps the LLVM IR from before and after LLVM's optimizations
+if [ -n "${VALEN_LLVM_IR:-}" ]; then mkdir -p "$VALEN_LLVM_IR" && find "$work/build" -name '*.ll' -exec cp {} "$VALEN_LLVM_IR/" \;; fi
 # The generated C headers show how each exported func crosses into Wasm
 if [ -n "${VALEN_HEADERS:-}" ]; then cp -r "$work/build/include" "$VALEN_HEADERS"; fi

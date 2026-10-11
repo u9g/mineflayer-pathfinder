@@ -122,14 +122,14 @@ jobs:
           exports=$(sed -n 's#^// exports: ##p' lib/valen/pathfinder.vale)
           mkdir -p opt-levels
           for level in O0 O1 O2; do
-            VALEN_OPT_LEVEL=$level lib/valen/build.sh opt-levels/pathfinder-$level.wasm "$exports"
+            VALEN_OPT_LEVEL=$level VALEN_LLVM_IR=opt-levels/ir-$level lib/valen/build.sh opt-levels/pathfinder-$level.wasm "$exports"
           done
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
           name: pathfinder-opt-levels
-          path: opt-levels/*.wasm
+          path: opt-levels
 
       - run: npm install
         if: ${{ !cancelled() }}
