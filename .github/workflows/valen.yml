@@ -41,15 +41,20 @@ jobs:
       # Two changes to Valen: its backend keeps unordered_maps of types it only forward-declares,
       # which macOS's libc++ accepts and Linux's libstdc++ rejects; and valec's --borrow-check
       # couldn't be turned off (lib/valen/build.sh says why the pathfinder needs that).
+      #
+      # The checkout is backdated first, so with the last run's build restored below, make and
+      # cargo only rebuild what the patch touches.
       - name: Patch Valen
-        run: git -C valen apply "$GITHUB_WORKSPACE/lib/valen/valen.patch"
+        run: |
+          find valen -path valen/.git -prune -o -type f -exec touch -d 2000-01-01 {} +
+          git -C valen apply "$GITHUB_WORKSPACE/lib/valen/valen.patch"
 
       - name: Install LLVM 21
         run: |
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-21 main" | sudo tee /etc/apt/sources.list.d/llvm.list
           sudo apt-get update
-          sudo apt-get install -y llvm-21 llvm-21-dev clang-21 libpolly-21-dev cmake build-essential zlib1g-dev libzstd-dev libcurl4-openssl-dev
+          sudo apt-get install -y llvm-21 llvm-21-dev clang-21 libpolly-21-dev cmake build-essential zlib1g-dev libzstd-dev libcurl4-openssl-dev gdb
           echo "LLVM_CONFIG=/usr/bin/llvm-config-21" >> $GITHUB_ENV
 
       - name: Install wasi-sdk and wasmtime
@@ -65,18 +70,19 @@ jobs:
         with:
           toolchain: ${{ env.RUST_NIGHTLY }}
 
-      # Restore and save separately, so a failing test still keeps the built compiler
+      # The newest build for this Valen and toolchain, whatever the patch, to build on
       - uses: actions/cache/restore@v4
         id: valec
         with:
           path: valen/target
-          key: valec-${{ env.VALEN_REF }}-${{ env.RUST_NIGHTLY }}-${{ hashFiles('lib/valen/valen.patch') }}
+          key: valec-${{ env.VALEN_REF }}-${{ env.RUST_NIGHTLY }}-${{ github.run_id }}
+          restore-keys: valec-${{ env.VALEN_REF }}-${{ env.RUST_NIGHTLY }}-
 
       - name: Build valec
         run: cargo build --manifest-path valen/Cargo.toml --bin valec
 
+      # Saved right away, so a failing test still keeps the built compiler
       - uses: actions/cache/save@v4
-        if: steps.valec.outputs.cache-hit != 'true'
         with:
           path: valen/target
           key: ${{ steps.valec.outputs.cache-primary-key }}

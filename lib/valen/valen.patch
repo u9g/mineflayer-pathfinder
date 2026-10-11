@@ -1,5 +1,20 @@
+diff --git a/Backend/src/function/expressions/shared/elements.cpp b/Backend/src/function/expressions/shared/elements.cpp
+index 17ea6807..8aa7a026 100644
+--- a/Backend/src/function/expressions/shared/elements.cpp
++++ b/Backend/src/function/expressions/shared/elements.cpp
+@@ -137,8 +137,9 @@ IncrementedSize incrementRSASize(
+     FunctionState* functionState,
+     LLVMBuilderRef builder,
+     WrapperPtrLE rsaWPtrLE) {
++  // A runtime-sized array always lives behind a pointer, never inline, so its size is always
++  // in its wrapper.
+   auto sizePtrLE = ::getRuntimeSizedArrayLengthPtr(globalState, builder, rsaWPtrLE);
+-  assert(false); // implement inline arrays
+ 
+   adjustCounterV(globalState, builder, globalState->metalCache->i32Type, sizePtrLE, 1, false);
+ 
 diff --git a/Backend/src/metal/ast.h b/Backend/src/metal/ast.h
-index 1c73af7..98637f2 100644
+index 1c73af7c..98637f20 100644
 --- a/Backend/src/metal/ast.h
 +++ b/Backend/src/metal/ast.h
 @@ -39,10 +39,35 @@ class Edge;
@@ -77,7 +92,7 @@ index 1c73af7..98637f2 100644
    template<> struct hash<VarNameM> {
      size_t operator()(const VarNameM& v) const { return std::hash<std::string>()(v.name); }
 diff --git a/src/bin/valec/build.rs b/src/bin/valec/build.rs
-index 08fad75..dc3ba3e 100644
+index 08fad758..dc3ba3e8 100644
 --- a/src/bin/valec/build.rs
 +++ b/src/bin/valec/build.rs
 @@ -62,7 +62,7 @@ pub struct BuildArgs {

@@ -44,7 +44,7 @@ chmod +x "$work/clang"
 # Without the borrow checker: it doesn't cover pushing to and popping from arrays yet
 # (unimplemented!() in Valen's groupify_function.rs), which every growable collection needs.
 # Valen's own HashMap tests are built the same way.
-"$VALEN_DIR/target/debug/valec" build \
+set -- build \
   --no-std \
   --borrow-check "${VALEN_BORROW_CHECK:-false}" \
   --builtins-dir-override "$VALEN_DIR/Backend/builtins" \
@@ -54,6 +54,14 @@ chmod +x "$work/clang"
   --output-dir "$work/build" \
   -o out.wasm \
   pathfinder="$work/src"
+code=0
+"$VALEN_DIR/target/debug/valec" "$@" || code=$?
+if [ $code -ge 128 ] && command -v gdb > /dev/null; then
+  # The compiler crashed (an assertion in its backend, say): show where
+  echo "valec crashed; its backtrace:"
+  gdb -batch -ex run -ex bt --args "$VALEN_DIR/target/debug/valec" "$@" 2>&1 | grep -E "^#[0-9]+ " | head -25
+fi
+if [ $code -ne 0 ]; then exit $code; fi
 
 cp "$work/build/out.wasm" "$wasm"
 # The generated C headers show how each exported func crosses into Wasm
