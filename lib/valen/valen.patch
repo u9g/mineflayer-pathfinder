@@ -461,10 +461,27 @@ index 17ea6807..40835d3b 100644
    adjustCounterV(globalState, builder, globalState->metalCache->i32Type, sizePtrLE, 1, false);
  
 diff --git a/Backend/src/function/expressions/shared/ref.cpp b/Backend/src/function/expressions/shared/ref.cpp
-index ba04fe72..1cdb5024 100644
+index ba04fe72..09889451 100644
 --- a/Backend/src/function/expressions/shared/ref.cpp
 +++ b/Backend/src/function/expressions/shared/ref.cpp
-@@ -37,7 +37,17 @@ LiveRef toLiveRef(WrapperPtrLE wrapperPtrLE) {
+@@ -1,9 +1,16 @@
+ #include <llvm-c/Core.h>
++#include <iostream>
++#include <typeinfo>
+ #include "ref.h"
+ #include "../../../region/iregion.h"
+ #include "../../../globalstate.h"
+ 
+ Ref toRef(IRegion* region, Kind* refM, LLVMValueRef exprLE) {
++  if (LLVMTypeOf(exprLE) != region->translateType(refM)) {
++    std::cerr << "toRef: a " << LLVMPrintTypeToString(LLVMTypeOf(exprLE)) << " for a "
++        << typeid(*refM).name() << ", which translates to "
++        << LLVMPrintTypeToString(region->translateType(refM)) << std::endl;
++  }
+   assert(LLVMTypeOf(exprLE) == region->translateType(refM));
+   return Ref(refM, exprLE);
+ }
+@@ -37,7 +44,17 @@ LiveRef toLiveRef(WrapperPtrLE wrapperPtrLE) {
  }
  
  WrapperPtrLE toWrapperPtr(FunctionState* functionState, LLVMBuilderRef builder, KindStructs* kindStructs, Kind* refMT, LiveRef liveRef) {
@@ -605,6 +622,20 @@ index e26e39f2..1172ec7c 100644
  
  
  PackageBuilderHandle* metal_package_builder_new(
+diff --git a/Backend/src/region/common/common.cpp b/Backend/src/region/common/common.cpp
+index 8a38e6c4..89abd7f4 100644
+--- a/Backend/src/region/common/common.cpp
++++ b/Backend/src/region/common/common.cpp
+@@ -97,7 +97,8 @@ LLVMValueRef getItablePtrFromInterfacePtr(
+     Kind* virtualParamMT,
+     InterfaceFatPtrLE virtualArgLE) {
+   buildFlare(FL(), globalState, functionState, builder);
+-  assert(LLVMTypeOf(virtualArgLE.refLE) == globalState->getRegion(virtualParamMT)->translateType(virtualParamMT));
++  auto interfaceValueType = peel_all_references(virtualParamMT);
++  assert(LLVMTypeOf(virtualArgLE.refLE) == globalState->getRegion(interfaceValueType)->translateType(interfaceValueType));
+   return getTablePtrFromInterfaceRef(builder, virtualArgLE);
+ }
+ 
 diff --git a/Backend/src/region/common/defaultlayout/structs.cpp b/Backend/src/region/common/defaultlayout/structs.cpp
 index 57332a9a..4eee7d49 100644
 --- a/Backend/src/region/common/defaultlayout/structs.cpp
