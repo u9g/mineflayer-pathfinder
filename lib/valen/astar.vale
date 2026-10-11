@@ -42,12 +42,12 @@ func f(nodes &List<PathNode>, index int) float {
 }
 
 func place(self &Heap mut, nodes &List<PathNode> mut, at int, node int) {
-  self.items.set(at, node);
+  drop(self.items.set(clone(at), clone(node)));
   set nodes.get(node).heapIndex = at;
 }
 
 func push(self &Heap mut, nodes &List<PathNode> mut, node int) {
-  self.items.add(node);
+  self.items.add(clone(node));
   set nodes.get(node).heapIndex = self.items.len() - 1;
   self.siftUp(nodes, self.items.len() - 1);
 }
@@ -174,26 +174,26 @@ func consider(self &Search mut, from int, fromG float, neighbor Move) {
   key = neighbor.pos();
   existing = if (self.byPos.has(&key)) { self.byPos.get(&key) } else { -1 };
   if (existing >= 0 and self.nodes.get(existing).closed) {
-    return; // skip closed neighbors
+    return void(); // skip closed neighbors
   }
   gFromThisNode = fromG + neighbor.cost;
 
   heuristic = goalHeuristic(neighbor.x, neighbor.y, neighbor.z);
   if (self.maxCost > 0.0 and gFromThisNode + heuristic > self.maxCost) {
-    return;
+    return void();
   }
 
   if (existing < 0) {
     // add neighbor to the open set
     index = self.nodes.len();
     self.nodes.add(PathNode(^neighbor, gFromThisNode, heuristic, gFromThisNode + heuristic, from, false, -1));
-    self.byPos.put(^key, index);
+    self.byPos.put(^key, clone(index));
     self.noteBest(index);
     self.open.push(&self.nodes, index);
   } else {
     node = self.nodes.get(existing);
     if (node.g < gFromThisNode) {
-      return; // skip this one because another route is faster
+      return void(); // skip this one because another route is faster
     }
     // found a better route: update this neighbor with this node as its new parent
     drop(set node.move = ^neighbor);

@@ -101,7 +101,7 @@ func blockAt(self &World mut, x int, y int, z int, dy int) Block {
     return Block(false, state, x, y, z, false, false, false, false, false, false, false, false, false, float(dy));
   }
   if (not self.kinds.has(&state)) {
-    self.kinds.put(state, BlockKind(
+    self.kinds.put(clone(state), BlockKind(
       stateClimbable(state), stateSafe(state), statePhysical(state), stateReplaceable(state),
       stateLiquid(state), stateCanFall(state), stateOpenable(state), stateHasShapes(state),
       stateBreakable(state), stateTop(state)));
@@ -127,7 +127,7 @@ func near(self &World mut, target &Block, dx int, dy int, dz int) Block {
 
 func digCost(self &World mut, target &Block) float {
   if (not self.digCosts.has(&target.state)) {
-    self.digCosts.put(target.state, stateDigCost(target.state));
+    self.digCosts.put(clone(target.state), stateDigCost(target.state));
   }
   return self.digCosts.get(&target.state);
 }

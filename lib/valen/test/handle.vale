@@ -17,7 +17,7 @@ exported func newSearch(start int) Search {
 
 exported func step(self &Search) int {
   set self.counter.count = self.counter.count + 1;
-  self.counter.history.add(self.counter.count);
+  self.counter.history.add(clone(self.counter.count));
   return self.counter.history.len();
 }
 

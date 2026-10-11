@@ -38,7 +38,7 @@ exported func main() int {
   map = HashMap<Pos, int>();
   set i = 0 - 500;
   while (i < 500) {
-    map.put(Pos(i, i * 2, 7), i);
+    map.put(Pos(i, i * 2, 7), clone(i));
     set i = i + 1;
   }
   if (map.len() != 1000) { return 6; }

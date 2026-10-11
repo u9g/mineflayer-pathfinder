@@ -45,7 +45,7 @@ exported func reportPath(search &Search) {
   backwards = List<int>();
   i = search.result;
   while (search.nodes.get(i).parent >= 0) {
-    backwards.add(i);
+    backwards.add(clone(i));
     set i = search.nodes.get(i).parent;
   }
   while (not backwards.isEmpty()) {
