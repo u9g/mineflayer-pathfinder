@@ -1,6 +1,10 @@
-// The pathfinder's entry points for lib/valenAStar.js. Only numbers and bools cross into Wasm:
-// a Search stays in Wasm, JS holds it by handle between ticks, and the path comes back through
-// the externs below one move at a time.
+// The pathfinder's entry points for lib/valenAStar.js. Only numbers and bools cross into Wasm, and
+// the path comes back through the externs below one move at a time.
+//
+// A Search stays in Wasm between ticks, boxed in a one-element array: newSearch returns the box
+// into a slot JS allocates, and JS passes that slot back as the box's borrow. (Valen can't yet
+// take an owned struct or array back from the host, so endSearch empties the box rather than
+// destroying it.)
 // exports: newSearch,computeSearch,searchCost,visitedNodes,generatedNodes,reportPath,endSearch
 
 extern func pathMove(x int, y int, z int, remainingBlocks int, cost float, parkour bool);
@@ -15,33 +19,38 @@ exported func newSearch(
   allowEntityDetection bool, canOpenDoors bool, maxDropDown float,
   infiniteLiquidDropdownDistance bool, minY int,
   x int, y int, z int, remainingBlocks int, timeout float, tickTimeout float, searchRadius float
-) Search {
+) []Search {
   settings = Settings(
     canDig, placeCost, liquidCost, entityCost, dontCreateFlow, dontMineUnderFallingBlock,
     allow1by1towers, allowParkour, allowSprinting, allowEntityDetection, canOpenDoors,
     maxDropDown, infiniteLiquidDropdownDistance, minY);
-  return Search(World(^settings), Move(x, y, z, remainingBlocks, 0.0), timeout, tickTimeout, searchRadius);
+  box = Array<Search>(1);
+  box.push(Search(World(^settings), Move(x, y, z, remainingBlocks, 0.0), timeout, tickTimeout, searchRadius));
+  return ^box;
 }
 
 // Searches until done or out of time for this tick: 0 success, 1 partial, 2 timeout, 3 noPath
-exported func computeSearch(search &Search mut) int {
-  return search.compute();
+exported func computeSearch(box &[]Search mut) int {
+  return box[0].compute();
 }
 
-exported func searchCost(search &Search) float {
+exported func searchCost(box &[]Search) float {
+  search = box[0];
   return search.nodes.get(search.result).g;
 }
 
-exported func visitedNodes(search &Search) int {
-  return search.closedCount;
+exported func visitedNodes(box &[]Search) int {
+  return box[0].closedCount;
 }
 
-exported func generatedNodes(search &Search) int {
+exported func generatedNodes(box &[]Search) int {
+  search = box[0];
   return search.closedCount + search.open.size();
 }
 
 // Reports the path to the node the last compute ended on, from the start's first move
-exported func reportPath(search &Search) {
+exported func reportPath(box &[]Search) {
+  search = box[0];
   backwards = List<int>();
   i = search.result;
   while (search.nodes.get(i).parent >= 0) {
@@ -72,8 +81,8 @@ exported func reportPath(search &Search) {
   drop(^backwards);
 }
 
-exported func endSearch(search Search) {
-  drop(^search);
+exported func endSearch(box &[]Search mut) {
+  drop(box.pop());
 }
 
 // valec only builds programs; lib/valenAStar.js never calls this

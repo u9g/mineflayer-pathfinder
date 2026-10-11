@@ -32,7 +32,7 @@ flags=""
 if [ "$exports" != "-" ]; then
   # valec links a command around main. A reactor instead stays usable between calls; the
   # externs are left undefined to become imports, and the exported funcs are kept as exports.
-  flags="-mexec-model=reactor -Wl,--allow-undefined"
+  flags="-mexec-model=reactor -Wl,--allow-undefined -Wl,--export=malloc -Wl,--export=free"
   for name in $(echo "$exports" | tr ',' ' '); do flags="$flags -Wl,--export=pathfinder_$name"; done
 fi
 cat > "$work/clang" <<WRAPPER

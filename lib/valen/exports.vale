@@ -36,3 +36,5 @@ export Opt<Entry<Pos, int>> as IndexSlot;
 export Some<Entry<Pos, int>> as IndexFullSlot;
 export None<Entry<Pos, int>> as IndexEmptySlot;
 export Entry<Pos, int> as IndexEntry;
+
+export []Search as SearchBox;

@@ -15,7 +15,7 @@ index 7cbaf3d4..4e8054ad 100644
      globalState->getRegion(resultValueType)
          ->alias(FL(), functionState, builder, resultType, resultRef);
 diff --git a/Backend/src/function/expressions/externs.cpp b/Backend/src/function/expressions/externs.cpp
-index f8885afa..f9c4beae 100644
+index f8885afa..b11ec440 100644
 --- a/Backend/src/function/expressions/externs.cpp
 +++ b/Backend/src/function/expressions/externs.cpp
 @@ -182,6 +182,9 @@ Ref buildCallOrSideCall(
@@ -28,7 +28,7 @@ index f8885afa..f9c4beae 100644
    assert(externFuncIter != globalState->externFunctions.end());
    auto externFuncL = externFuncIter->second;
  
-@@ -244,165 +247,167 @@ Ref buildExternCall(
+@@ -244,184 +247,180 @@ Ref buildExternCall(
      LLVMBuilderRef builder,
      Prototype* prototype,
      const std::vector<Ref>& args) {
@@ -221,10 +221,23 @@ index f8885afa..f9c4beae 100644
      assert(args.size() == 1);
  
 -    assert(dynamic_cast<ShareRef*>(prototype->params[0]) != nullptr);
-     auto expectedType = globalState->metalCache->str;
+-    auto expectedType = globalState->metalCache->str;
+-
+-    auto strLiveRef =
+-        globalState->getRegion(expectedType)
+-        ->checkRefLive(FL(), functionState, builder, expectedType, args[0]);
++    auto strRefMT = prototype->params[0];
++    auto strRegion = globalState->getRegion(globalState->metalCache->str);
  
-     auto strLiveRef =
-@@ -418,10 +423,10 @@ Ref buildExternCall(
+-    auto resultLenLE =
+-        globalState->getRegion(expectedType)
+-        ->getStringLen(
+-            functionState, builder, expectedType, strLiveRef);
+-    globalState->getRegion(expectedType)
+-        ->dealias(FL(), functionState, builder, expectedType, args[0]);
++    auto strLiveRef = strRegion->checkRefLive(FL(), functionState, builder, strRefMT, args[0]);
++    auto resultLenLE = strRegion->getStringLen(functionState, builder, strRefMT, strLiveRef);
++    strRegion->dealias(FL(), functionState, builder, strRefMT, args[0]);
      return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultLenLE);
    }
    // VCOORD: TEMPORARY: this whole section exists only until str is a proper Vale
@@ -239,7 +252,7 @@ index f8885afa..f9c4beae 100644
      // Signature: (a str, aBegin i32, aEnd i32, b str, bBegin i32, bEnd i32) -> str|bool|i32
      assert(args.size() == 6);
      auto strTypeA = globalState->metalCache->str;
-@@ -454,7 +459,7 @@ Ref buildExternCall(
+@@ -454,7 +453,7 @@ Ref buildExternCall(
            globalState->getRegion(strTypeB)->dealias(FL(), functionState, builder, strTypeB, args[3]);
            return resultRef;
          };
@@ -248,7 +261,7 @@ index f8885afa..f9c4beae 100644
        auto totalLenLE = LLVMBuildAdd(builder, aLenLE, bLenLE, "totalLen");
        auto strResultRef = globalState->getRegion(globalState->metalCache->str)
            ->mallocStr(functionState, builder, totalLenLE, aStartLE);
-@@ -471,7 +476,7 @@ Ref buildExternCall(
+@@ -471,7 +470,7 @@ Ref buildExternCall(
        auto bLenI64LE = LLVMBuildZExt(builder, bLenLE, LLVMInt64TypeInContext(globalState->context), "bLenI64");
        buildCallWith64BitSExt(globalState, builder, globalState->externs->memcpy, {resultBOffsetLE, bStartLE, bLenI64LE});
        return dealiasBothAndReturn(strResultRef);
@@ -257,7 +270,7 @@ index f8885afa..f9c4beae 100644
        // Return (aLen == bLen) && memcmp(aStart, bStart, aLen) == 0.
        auto lenEqLE = LLVMBuildICmp(builder, LLVMIntEQ, aLenLE, bLenLE, "lenEq");
        auto minLenLE = LLVMBuildSelect(builder,
-@@ -486,7 +491,7 @@ Ref buildExternCall(
+@@ -486,7 +485,7 @@ Ref buildExternCall(
        auto eqLE = LLVMBuildAnd(builder, lenEqLE, cmpZeroLE, "eq");
        return dealiasBothAndReturn(
            toRef(globalState->getRegion(prototype->returnType), prototype->returnType, eqLE));
@@ -266,7 +279,7 @@ index f8885afa..f9c4beae 100644
        // Compare by memcmp up to min(aLen, bLen); if equal but lengths differ,
        // shorter compares less.
        auto minLenLE = LLVMBuildSelect(builder,
-@@ -501,7 +506,7 @@ Ref buildExternCall(
+@@ -501,7 +500,7 @@ Ref buildExternCall(
        auto resultLE = LLVMBuildSelect(builder, cmpZeroLE, lenDiffLE, cmpLE, "cmpResult");
        return dealiasBothAndReturn(
            toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultLE));
@@ -275,7 +288,7 @@ index f8885afa..f9c4beae 100644
        auto findI64LE = buildCallWith64BitSExt(globalState, builder,
            globalState->externs->valeRtBytesFindLF,
            {aStartLE, aLenLE, bStartLE, bLenLE});
-@@ -513,7 +518,7 @@ Ref buildExternCall(
+@@ -513,7 +512,7 @@ Ref buildExternCall(
        assert(false);
        throw 1337;
      }
@@ -284,7 +297,7 @@ index f8885afa..f9c4beae 100644
      // Signature: (s str, begin i32, end i32) -> str
      assert(args.size() == 3);
      auto strType = globalState->metalCache->str;
-@@ -540,7 +545,7 @@ Ref buildExternCall(
+@@ -540,7 +539,7 @@ Ref buildExternCall(
  
      globalState->getRegion(strType)->dealias(FL(), functionState, builder, strType, args[0]);
      return strResultRef;
@@ -293,7 +306,7 @@ index f8885afa..f9c4beae 100644
      // Signature: (s str, begin i32, end i32) -> i32
      // Loads byte at s.chars[begin] and returns it zero-extended.
      assert(args.size() == 3);
-@@ -558,7 +563,7 @@ Ref buildExternCall(
+@@ -558,7 +557,7 @@ Ref buildExternCall(
  
      globalState->getRegion(strType)->dealias(FL(), functionState, builder, strType, args[0]);
      return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, byteI32LE);
@@ -302,7 +315,7 @@ index f8885afa..f9c4beae 100644
      // Signature: (code i32) -> str
      // Builds a 1-char string from the given ASCII code.
      assert(args.size() == 1);
-@@ -571,7 +576,7 @@ Ref buildExternCall(
+@@ -571,7 +570,7 @@ Ref buildExternCall(
      return globalState->getRegion(globalState->metalCache->str)
          ->mallocStr(functionState, builder,
              LLVMConstInt(int32LT, 1, false), bufLE);
@@ -311,7 +324,7 @@ index f8885afa..f9c4beae 100644
      // Signature: (s str, start i32, length i32) -> void
      assert(args.size() == 3);
      auto strType = globalState->metalCache->str;
-@@ -586,7 +591,7 @@ Ref buildExternCall(
+@@ -586,7 +585,7 @@ Ref buildExternCall(
      buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtWriteStdoutLF, {ptrLE, lengthLE});
      globalState->getRegion(strType)->dealias(FL(), functionState, builder, strType, args[0]);
      return makeVoidRef(globalState);
@@ -320,7 +333,7 @@ index f8885afa..f9c4beae 100644
      // Signature: (i int) -> str
      assert(args.size() == 1);
      auto int32LT = LLVMInt32TypeInContext(globalState->context);
-@@ -598,9 +603,9 @@ Ref buildExternCall(
+@@ -598,9 +597,9 @@ Ref buildExternCall(
      auto bytesPtrLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtGetMainArgPtrLF, {iI64LE});
      return globalState->getRegion(globalState->metalCache->str)
          ->mallocStr(functionState, builder, lenI32LE, bytesPtrLE);
@@ -333,7 +346,7 @@ index f8885afa..f9c4beae 100644
      // Signature: (x <primitive>) -> str
      // Format the primitive into a stack buffer via a C helper, then mallocStr.
      assert(args.size() == 1);
-@@ -613,10 +618,10 @@ Ref buildExternCall(
+@@ -613,10 +612,10 @@ Ref buildExternCall(
      auto bufSizeLE = LLVMConstInt(int32LT, bufSize, false);
      auto xLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
      LLVMValueRef writtenLE = nullptr;
@@ -346,7 +359,7 @@ index f8885afa..f9c4beae 100644
        writtenLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtI64ToAsciiLF, {xLE, bufPtrLE, bufSizeLE});
      } else {
        writtenLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtFloatToAsciiLF, {xLE, bufPtrLE, bufSizeLE});
-@@ -624,59 +629,59 @@ Ref buildExternCall(
+@@ -624,59 +623,59 @@ Ref buildExternCall(
      auto writtenI32LE = LLVMBuildTrunc(builder, writtenLE, int32LT, "writtenI32");
      return globalState->getRegion(globalState->metalCache->str)
          ->mallocStr(functionState, builder, writtenI32LE, bufPtrLE);
@@ -429,19 +442,20 @@ index 17ea6807..40835d3b 100644
    adjustCounterV(globalState, builder, globalState->metalCache->i32Type, sizePtrLE, 1, false);
  
 diff --git a/Backend/src/function/expressions/shared/ref.cpp b/Backend/src/function/expressions/shared/ref.cpp
-index ba04fe72..796129aa 100644
+index ba04fe72..1cdb5024 100644
 --- a/Backend/src/function/expressions/shared/ref.cpp
 +++ b/Backend/src/function/expressions/shared/ref.cpp
-@@ -37,7 +37,16 @@ LiveRef toLiveRef(WrapperPtrLE wrapperPtrLE) {
+@@ -37,7 +37,17 @@ LiveRef toLiveRef(WrapperPtrLE wrapperPtrLE) {
  }
  
  WrapperPtrLE toWrapperPtr(FunctionState* functionState, LLVMBuilderRef builder, KindStructs* kindStructs, Kind* refMT, LiveRef liveRef) {
 -  return kindStructs->makeWrapperPtr(FL(), functionState, builder, refMT, liveRef.refLE);
 +  auto ptrLE = liveRef.refLE;
-+  // A borrow points at the slot holding its referent. A runtime-sized array's value is already a
-+  // pointer to its wrapper, so a borrow of one has to load that pointer out of the slot.
++  // A borrow points at the slot holding its referent. A runtime-sized array's or a string's value
++  // is already a pointer to its wrapper, so a borrow of one has to load that pointer out of the slot.
 +  if (auto borrowRef = dynamic_cast<BorrowRef*>(refMT)) {
-+    if (dynamic_cast<RuntimeSizedArrayT*>(peel_all_references(borrowRef->inner))) {
++    auto innerValueType = peel_all_references(borrowRef->inner);
++    if (dynamic_cast<RuntimeSizedArrayT*>(innerValueType) || dynamic_cast<Str*>(innerValueType)) {
 +      auto ptrLT = LLVMPointerTypeInContext(LLVMGetTypeContext(LLVMTypeOf(ptrLE)), 0);
 +      ptrLE = LLVMBuildLoad2(builder, ptrLT, ptrLE, "rsaWrapperPtr");
 +    }
