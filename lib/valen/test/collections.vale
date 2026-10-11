@@ -1,4 +1,5 @@
 // Checks List and HashMap; main returns 0, or the number of the first failed check.
+// uses: list.vale hashmap.vale
 
 struct Pos {
   x int;

@@ -1,5 +1,6 @@
 // Can JS hold a Valen object between calls? Built as a reactor; handle.js drives it.
 // exports: newSearch,step,total
+// uses: list.vale
 
 struct Counter {
   count int;

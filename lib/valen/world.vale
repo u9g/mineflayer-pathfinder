@@ -1,0 +1,153 @@
+// What the search knows about the world: the blocks around a node, as Movements.getBlock sees
+// them, and the entities in the way. The block properties come from JS once per block state
+// and stay cached for the search, since they only change with the Movements settings.
+
+// The world and the bot, provided by lib/valenAStar.js
+extern func blockStateAt(x int, y int, z int) int; // -1 where the world has no block
+extern func stateClimbable(state int) bool;
+extern func stateSafe(state int) bool;
+extern func statePhysical(state int) bool;
+extern func stateReplaceable(state int) bool;
+extern func stateLiquid(state int) bool;
+extern func stateCanFall(state int) bool;
+extern func stateOpenable(state int) bool;
+extern func stateHasShapes(state int) bool;
+extern func stateBreakable(state int) bool; // has a type and isn't in blocksCantBreak
+extern func stateTop(state int) float; // the highest top of its shapes, at least 0
+extern func stateDigCost(state int) float; // the labor cost of breaking it with the best tool
+extern func entitiesAt(x int, y int, z int) int;
+
+struct Pos {
+  x int;
+  y int;
+  z int;
+}
+
+func hash(self &Pos) int {
+  return (self.x * 92821 + self.y) * 31 + self.z;
+}
+
+func ==(a &Pos, b &Pos) bool {
+  return a.x == b.x and a.y == b.y and a.z == b.z;
+}
+
+struct BlockKind {
+  climbable bool;
+  safe bool;
+  physical bool;
+  replaceable bool;
+  liquid bool;
+  canFall bool;
+  openable bool;
+  hasShapes bool;
+  breakable bool;
+  top float;
+}
+
+// A block as Movements.getBlock returns it. Where the world has no block, getBlock returns a stub
+// with no position and a height of just dy; loaded is false and those are kept.
+struct Block {
+  loaded bool;
+  state int;
+  x int;
+  y int;
+  z int;
+  climbable bool;
+  safe bool;
+  physical bool;
+  replaceable bool;
+  liquid bool;
+  canFall bool;
+  openable bool;
+  hasShapes bool;
+  breakable bool;
+  height float;
+}
+
+struct Settings {
+  canDig bool;
+  placeCost float;
+  liquidCost float;
+  entityCost float;
+  dontCreateFlow bool;
+  dontMineUnderFallingBlock bool;
+  allow1by1towers bool;
+  allowParkour bool;
+  allowSprinting bool;
+  allowEntityDetection bool;
+  canOpenDoors bool;
+  maxDropDown float;
+  infiniteLiquidDropdownDistance bool;
+  minY int;
+}
+
+struct World {
+  settings Settings;
+  kinds HashMap<int, BlockKind>;
+  digCosts HashMap<int, float>;
+}
+
+func hash(self &int) int {
+  return self;
+}
+
+func World(settings Settings) World {
+  return World(settings, HashMap<int, BlockKind>(), HashMap<int, float>());
+}
+
+func blockAt(self &World mut, x int, y int, z int, dy int) Block {
+  state = blockStateAt(x, y, z);
+  if state < 0 {
+    return Block(false, state, x, y, z, false, false, false, false, false, false, false, false, false, float(dy));
+  }
+  if not self.kinds.has(&state) {
+    self.kinds.put(state, BlockKind(
+      stateClimbable(state), stateSafe(state), statePhysical(state), stateReplaceable(state),
+      stateLiquid(state), stateCanFall(state), stateOpenable(state), stateHasShapes(state),
+      stateBreakable(state), stateTop(state)));
+  }
+  kind = self.kinds.get(&state);
+  return Block(
+    true, state, x, y, z, kind.climbable, kind.safe, kind.physical, kind.replaceable, kind.liquid,
+    kind.canFall, kind.openable, kind.hasShapes, kind.breakable, float(y) + kind.top);
+}
+
+// getBlock(node, dx, dy, dz)
+func near(self &World mut, node &Move, dx int, dy int, dz int) Block {
+  return self.blockAt(node.x + dx, node.y + dy, node.z + dz, dy);
+}
+
+// getBlock(block.position, dx, dy, dz), which gives a stub for a stub
+func near(self &World mut, block &Block, dx int, dy int, dz int) Block {
+  if not block.loaded {
+    return Block(false, -1, 0, 0, 0, false, false, false, false, false, false, false, false, false, float(dy));
+  }
+  return self.blockAt(block.x + dx, block.y + dy, block.z + dz, dy);
+}
+
+func digCost(self &World mut, block &Block) float {
+  if not self.digCosts.has(&block.state) {
+    self.digCosts.put(block.state, stateDigCost(block.state));
+  }
+  return self.digCosts.get(&block.state);
+}
+
+// getNumEntitiesAt(node, dx, dy, dz)
+func entitiesNear(self &World, node &Move, dx int, dy int, dz int) int {
+  if not self.settings.allowEntityDetection {
+    return 0;
+  }
+  return entitiesAt(node.x + dx, node.y + dy, node.z + dz);
+}
+
+// getNumEntitiesAt(block.position, dx, dy, dz), which is 0 for a stub
+func entitiesNear(self &World, block &Block, dx int, dy int, dz int) int {
+  if not self.settings.allowEntityDetection or not block.loaded {
+    return 0;
+  }
+  return entitiesAt(block.x + dx, block.y + dy, block.z + dz);
+}
+
+func pos(self &Block) Pos {
+  return Pos(self.x, self.y, self.z);
+}

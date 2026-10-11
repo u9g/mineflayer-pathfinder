@@ -1,0 +1,459 @@
+// The moves the bot can make from a node and what each costs: lib/movements.js, step for step,
+// so a search here finds the same path as the JS one. Exclusion areas are JS callbacks, so a
+// Movements with any of them searches in JS instead (see lib/valenAStar.js).
+
+// A node of the search: a position and how the bot gets there from its parent
+struct Move {
+  x int;
+  y int;
+  z int;
+  remainingBlocks int;
+  cost float;
+  toBreak List<Pos>;
+  toPlace List<Placement>;
+  parkour bool;
+}
+
+func Move(x int, y int, z int, remainingBlocks int, cost float, toBreak List<Pos>, toPlace List<Placement>) Move {
+  return Move(x, y, z, remainingBlocks, cost, toBreak, toPlace, false);
+}
+
+func Move(x int, y int, z int, remainingBlocks int, cost float, toBreak List<Pos>) Move {
+  return Move(x, y, z, remainingBlocks, cost, toBreak, List<Placement>(), false);
+}
+
+func Move(x int, y int, z int, remainingBlocks int, cost float) Move {
+  return Move(x, y, z, remainingBlocks, cost, List<Pos>(), List<Placement>(), false);
+}
+
+func pos(self &Move) Pos {
+  return Pos(self.x, self.y, self.z);
+}
+
+// A block to place against the block at x, y, z on its dx, dy, dz face
+struct Placement {
+  x int;
+  y int;
+  z int;
+  dx int;
+  dy int;
+  dz int;
+  jump bool;
+  useOne bool; // use the block there (open a gate) instead of placing one
+  returnPos Opt<Pos>;
+}
+
+func Placement(x int, y int, z int, dx int, dy int, dz int) Placement {
+  return Placement(x, y, z, dx, dy, dz, false, false, None<Pos>());
+}
+
+func sqrt2() float {
+  return 1.4142135623730951;
+}
+
+func getNeighbors(self &World mut, node &Move) List<Move> {
+  neighbors = List<Move>();
+
+  // Simple moves in 4 cardinal points: west, east, north, south
+  self.cardinalMoves(node, -1, 0, &neighbors);
+  self.cardinalMoves(node, 1, 0, &neighbors);
+  self.cardinalMoves(node, 0, -1, &neighbors);
+  self.cardinalMoves(node, 0, 1, &neighbors);
+
+  // Diagonals
+  self.getMoveDiagonal(node, -1, -1, &neighbors);
+  self.getMoveDiagonal(node, -1, 1, &neighbors);
+  self.getMoveDiagonal(node, 1, -1, &neighbors);
+  self.getMoveDiagonal(node, 1, 1, &neighbors);
+
+  self.getMoveDown(node, &neighbors);
+  self.getMoveUp(node, &neighbors);
+  return neighbors;
+}
+
+func cardinalMoves(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
+  self.getMoveForward(node, dirX, dirZ, neighbors);
+  self.getMoveJumpUp(node, dirX, dirZ, neighbors);
+  self.getMoveDropDown(node, dirX, dirZ, neighbors);
+  if self.settings.allowParkour {
+    self.getMoveParkourForward(node, dirX, dirZ, neighbors);
+  }
+}
+
+func safeToBreak(self &World mut, block &Block) bool {
+  if not self.settings.canDig {
+    return false;
+  }
+
+  if self.settings.dontCreateFlow {
+    // false if next to liquid
+    if self.near(block, 0, 1, 0).liquid { return false; }
+    if self.near(block, -1, 0, 0).liquid { return false; }
+    if self.near(block, 1, 0, 0).liquid { return false; }
+    if self.near(block, 0, 0, -1).liquid { return false; }
+    if self.near(block, 0, 0, 1).liquid { return false; }
+  }
+
+  if self.settings.dontMineUnderFallingBlock {
+    if self.near(block, 0, 1, 0).canFall or self.entitiesNear(block, 0, 1, 0) > 0 {
+      return false;
+    }
+  }
+
+  return block.breakable;
+}
+
+// The cost of stepping into block, breaking it if it's in the way; 100 if it can't be broken
+func safeOrBreak(self &World mut, block &Block, toBreak &List<Pos> mut) float {
+  cost = float(self.entitiesNear(block, 0, 0, 0)) * self.settings.entityCost;
+  if block.safe {
+    return cost;
+  }
+  if not self.safeToBreak(block) {
+    return 100.0; // Can't break, so can't move
+  }
+  toBreak.add(block.pos());
+
+  if block.physical {
+    // An entity on top of the block will fall
+    set cost = cost + float(self.entitiesNear(block, 0, 1, 0)) * self.settings.entityCost;
+  }
+  return cost + self.digCost(block);
+}
+
+func getMoveJumpUp(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
+  blockA = self.near(node, 0, 2, 0);
+  blockH = self.near(node, dirX, 2, dirZ);
+  blockB = self.near(node, dirX, 1, dirZ);
+  blockC = self.near(node, dirX, 0, dirZ);
+
+  cost = 2.0; // move cost (move+jump)
+  toBreak = List<Pos>();
+  toPlace = List<Placement>();
+
+  // A, B and H are above C, D and the bot's space: no entity may fall onto the building space
+  if blockA.physical and self.entitiesNear(&blockA, 0, 1, 0) > 0 { return; }
+  if blockH.physical and self.entitiesNear(&blockH, 0, 1, 0) > 0 { return; }
+  // An entity may fall on B, as long as C needn't be replaced
+  if blockB.physical and not blockH.physical and not blockC.physical and self.entitiesNear(&blockB, 0, 1, 0) > 0 { return; }
+
+  if not blockC.physical {
+    if node.remainingBlocks == 0 { return; } // not enough blocks to place
+
+    if self.entitiesNear(&blockC, 0, 0, 0) > 0 { return; } // an entity in the way of the placement
+
+    blockD = self.near(node, dirX, -1, dirZ);
+    if not blockD.physical {
+      if node.remainingBlocks == 1 { return; } // not enough blocks to place
+
+      if self.entitiesNear(&blockD, 0, 0, 0) > 0 { return; }
+
+      if not blockD.replaceable {
+        if not self.safeToBreak(&blockD) { return; }
+        toBreak.add(blockD.pos());
+      }
+      toPlace.add(Placement(node.x, node.y - 1, node.z, dirX, 0, dirZ, false, false, Some(Pos(node.x, node.y, node.z))));
+      set cost = cost + self.settings.placeCost;
+    }
+
+    if not blockC.replaceable {
+      if not self.safeToBreak(&blockC) { return; }
+      toBreak.add(blockC.pos());
+    }
+    toPlace.add(Placement(node.x + dirX, node.y - 1, node.z + dirZ, 0, 1, 0));
+    set cost = cost + self.settings.placeCost;
+
+    set blockC.height = blockC.height + 1.0;
+  }
+
+  block0 = self.near(node, 0, -1, 0);
+  if blockC.height - block0.height > 1.2 { return; } // Too high to jump
+
+  set cost = cost + self.safeOrBreak(&blockA, &toBreak);
+  if cost > 100.0 { return; }
+  set cost = cost + self.safeOrBreak(&blockH, &toBreak);
+  if cost > 100.0 { return; }
+  set cost = cost + self.safeOrBreak(&blockB, &toBreak);
+  if cost > 100.0 { return; }
+
+  remaining = node.remainingBlocks - toPlace.len();
+  neighbors.add(Move(blockB.x, blockB.y, blockB.z, remaining, cost, toBreak, toPlace));
+}
+
+func getMoveForward(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
+  blockB = self.near(node, dirX, 1, dirZ);
+  blockC = self.near(node, dirX, 0, dirZ);
+  blockD = self.near(node, dirX, -1, dirZ);
+
+  cost = 1.0; // move cost
+  toBreak = List<Pos>();
+  toPlace = List<Placement>();
+
+  if not blockD.physical and not blockC.liquid {
+    if node.remainingBlocks == 0 { return; } // not enough blocks to place
+
+    if self.entitiesNear(&blockD, 0, 0, 0) > 0 { return; } // D intersects an entity hitbox
+
+    if not blockD.replaceable {
+      if not self.safeToBreak(&blockD) { return; }
+      toBreak.add(blockD.pos());
+    }
+    toPlace.add(Placement(node.x, node.y - 1, node.z, dirX, 0, dirZ));
+    set cost = cost + self.settings.placeCost;
+  }
+
+  set cost = cost + self.safeOrBreak(&blockB, &toBreak);
+  if cost > 100.0 { return; }
+
+  if self.settings.canOpenDoors and blockC.openable and blockC.hasShapes {
+    // Open the fence gate: use the block there instead of placing one
+    toPlace.add(Placement(node.x + dirX, node.y, node.z + dirZ, 0, 0, 0, false, true, None<Pos>()));
+  } else {
+    set cost = cost + self.safeOrBreak(&blockC, &toBreak);
+    if cost > 100.0 { return; }
+  }
+
+  if self.near(node, 0, 0, 0).liquid {
+    set cost = cost + self.settings.liquidCost;
+  }
+
+  remaining = node.remainingBlocks - toPlace.len();
+  neighbors.add(Move(blockC.x, blockC.y, blockC.z, remaining, cost, toBreak, toPlace));
+}
+
+func getMoveDiagonal(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
+  cost = sqrt2(); // move cost
+  toBreak = List<Pos>();
+
+  // A diagonal jump can clip the corner of the raised block. Use the cardinal jump instead,
+  // where the executor can approach it head-on.
+  blockC = self.near(node, dirX, 0, dirZ); // Landing block
+  if blockC.physical { return; }
+
+  block0 = self.near(node, 0, -1, 0);
+
+  cost1 = 0.0;
+  toBreak1 = List<Pos>();
+  blockB1 = self.near(node, 0, 1, dirZ);
+  blockC1 = self.near(node, 0, 0, dirZ);
+  blockD1 = self.near(node, 0, -1, dirZ);
+  if not blockB1.safe or not blockC1.safe { return; }
+  set cost1 = cost1 + self.safeOrBreak(&blockB1, &toBreak1);
+  set cost1 = cost1 + self.safeOrBreak(&blockC1, &toBreak1);
+  if blockD1.height - block0.height > 1.2 {
+    set cost1 = cost1 + self.safeOrBreak(&blockD1, &toBreak1);
+  }
+
+  cost2 = 0.0;
+  toBreak2 = List<Pos>();
+  blockB2 = self.near(node, dirX, 1, 0);
+  blockC2 = self.near(node, dirX, 0, 0);
+  blockD2 = self.near(node, dirX, -1, 0);
+  if not blockB2.safe or not blockC2.safe { return; }
+  set cost2 = cost2 + self.safeOrBreak(&blockB2, &toBreak2);
+  set cost2 = cost2 + self.safeOrBreak(&blockC2, &toBreak2);
+  if blockD2.height - block0.height > 1.2 {
+    set cost2 = cost2 + self.safeOrBreak(&blockD2, &toBreak2);
+  }
+
+  if cost1 < cost2 {
+    set cost = cost + cost1;
+    toBreak.addAll(toBreak1);
+    drop(toBreak2);
+  } else {
+    set cost = cost + cost2;
+    toBreak.addAll(toBreak2);
+    drop(toBreak1);
+  }
+  if cost > 100.0 { return; }
+
+  landing = self.near(node, dirX, 0, dirZ);
+  set cost = cost + self.safeOrBreak(&landing, &toBreak);
+  if cost > 100.0 { return; }
+  head = self.near(node, dirX, 1, dirZ);
+  set cost = cost + self.safeOrBreak(&head, &toBreak);
+  if cost > 100.0 { return; }
+
+  if self.near(node, 0, 0, 0).liquid {
+    set cost = cost + self.settings.liquidCost;
+  }
+
+  blockD = self.near(node, dirX, -1, dirZ);
+  if blockD.physical or blockC.liquid {
+    neighbors.add(Move(blockC.x, blockC.y, blockC.z, node.remainingBlocks, cost, toBreak));
+  } else if self.near(node, dirX, -2, dirZ).physical or blockD.liquid {
+    if not blockD.safe { return; } // don't self-immolate
+    set cost = cost + float(self.entitiesNear(&blockC, 0, -1, 0)) * self.settings.entityCost;
+    neighbors.add(Move(blockC.x, blockC.y - 1, blockC.z, node.remainingBlocks, cost, toBreak));
+  }
+}
+
+// Where the bot lands dropping down from node by dirX, dirZ, as a block in getLandingBlock's
+// terms; None if it would fall too far or into something unsafe
+func getLandingBlock(self &World mut, node &Move, dirX int, dirZ int) Opt<Block> {
+  blockLand = self.near(node, dirX, -2, dirZ);
+  while blockLand.loaded and blockLand.y > self.settings.minY {
+    if blockLand.liquid and blockLand.safe {
+      return Some(blockLand);
+    }
+    if blockLand.physical {
+      if not (float(node.y - blockLand.y) > self.settings.maxDropDown) {
+        return Some(self.near(&blockLand, 0, 1, 0));
+      }
+      return None<Block>();
+    }
+    if not blockLand.safe {
+      return None<Block>();
+    }
+    set blockLand = self.near(&blockLand, 0, -1, 0);
+  }
+  return None<Block>();
+}
+
+func getMoveDropDown(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
+  blockB = self.near(node, dirX, 1, dirZ);
+  blockC = self.near(node, dirX, 0, dirZ);
+  blockD = self.near(node, dirX, -1, dirZ);
+
+  cost = 1.0; // move cost
+  toBreak = List<Pos>();
+
+  maybeLand = self.getLandingBlock(node, dirX, dirZ);
+  if maybeLand.isEmpty() { return; }
+  blockLand = maybeLand.get();
+  // Don't drop down into water
+  if not self.settings.infiniteLiquidDropdownDistance and float(node.y - blockLand.y) > self.settings.maxDropDown { return; }
+
+  set cost = cost + self.safeOrBreak(&blockB, &toBreak);
+  if cost > 100.0 { return; }
+  set cost = cost + self.safeOrBreak(&blockC, &toBreak);
+  if cost > 100.0 { return; }
+  set cost = cost + self.safeOrBreak(&blockD, &toBreak);
+  if cost > 100.0 { return; }
+
+  if blockC.liquid { return; } // dont go underwater
+
+  set cost = cost + float(self.entitiesNear(&blockLand, 0, 0, 0)) * self.settings.entityCost;
+
+  neighbors.add(Move(blockLand.x, blockLand.y, blockLand.z, node.remainingBlocks, cost, toBreak));
+}
+
+func getMoveDown(self &World mut, node &Move, neighbors &List<Move> mut) {
+  block0 = self.near(node, 0, -1, 0);
+
+  cost = 1.0; // move cost
+  toBreak = List<Pos>();
+
+  maybeLand = self.getLandingBlock(node, 0, 0);
+  if maybeLand.isEmpty() { return; }
+  blockLand = maybeLand.get();
+
+  set cost = cost + self.safeOrBreak(&block0, &toBreak);
+  if cost > 100.0 { return; }
+
+  if self.near(node, 0, 0, 0).liquid { return; } // dont go underwater
+
+  set cost = cost + float(self.entitiesNear(&blockLand, 0, 0, 0)) * self.settings.entityCost;
+
+  neighbors.add(Move(blockLand.x, blockLand.y, blockLand.z, node.remainingBlocks, cost, toBreak));
+}
+
+func getMoveUp(self &World mut, node &Move, neighbors &List<Move> mut) {
+  block1 = self.near(node, 0, 0, 0);
+  if block1.liquid { return; }
+  if self.entitiesNear(node, 0, 0, 0) > 0 { return; } // an entity is blocking the building area
+
+  block2 = self.near(node, 0, 2, 0);
+
+  cost = 1.0; // move cost
+  toBreak = List<Pos>();
+  toPlace = List<Placement>();
+  set cost = cost + self.safeOrBreak(&block2, &toBreak);
+  if cost > 100.0 { return; }
+
+  if not block1.climbable {
+    if not self.settings.allow1by1towers or node.remainingBlocks == 0 { return; } // not enough blocks to place
+
+    if not block1.replaceable {
+      if not self.safeToBreak(&block1) { return; }
+      toBreak.add(block1.pos());
+    }
+
+    block0 = self.near(node, 0, -1, 0);
+    if block0.physical and block0.height - float(node.y) < -0.2 { return; } // cannot jump-place from a half block
+
+    toPlace.add(Placement(node.x, node.y - 1, node.z, 0, 1, 0, true, false, None<Pos>()));
+    set cost = cost + self.settings.placeCost;
+  }
+
+  if cost > 100.0 { return; }
+
+  remaining = node.remainingBlocks - toPlace.len();
+  neighbors.add(Move(node.x, node.y + 1, node.z, remaining, cost, toBreak, toPlace));
+}
+
+// Jump up, down or forward over a 1 block gap
+func getMoveParkourForward(self &World mut, node &Move, dirX int, dirZ int, neighbors &List<Move> mut) {
+  block0 = self.near(node, 0, -1, 0);
+  block1 = self.near(node, dirX, -1, dirZ);
+  if (block1.physical and not (block1.height < block0.height)) or
+      not self.near(node, dirX, 0, dirZ).safe or
+      not self.near(node, dirX, 1, dirZ).safe {
+    return;
+  }
+  if self.near(node, 0, 0, 0).liquid { return; } // cant jump from water
+
+  cost = 1.0;
+
+  // Entities at the ceiling level along the path are left out: they rarely matter
+  set cost = cost + float(self.entitiesNear(node, dirX, 0, dirZ)) * self.settings.entityCost;
+
+  // If we have a block on the ceiling, we cannot jump but we can still fall
+  ceilingClear = self.near(node, 0, 2, 0).safe and self.near(node, dirX, 2, dirZ).safe;
+
+  // Similarly for the down path
+  floorCleared = not self.near(node, dirX, -2, dirZ).physical;
+
+  maxD = if self.settings.allowSprinting { 4 } else { 2 };
+
+  d = 2;
+  while d <= maxD {
+    dx = dirX * d;
+    dz = dirZ * d;
+    blockA = self.near(node, dx, 2, dz);
+    blockB = self.near(node, dx, 1, dz);
+    blockC = self.near(node, dx, 0, dz);
+    blockD = self.near(node, dx, -1, dz);
+
+    if blockC.safe {
+      set cost = cost + float(self.entitiesNear(&blockC, 0, 0, 0)) * self.settings.entityCost;
+    }
+
+    if ceilingClear and blockB.safe and blockC.safe and blockD.physical {
+      // Forward
+      neighbors.add(Move(blockC.x, blockC.y, blockC.z, node.remainingBlocks, cost, List<Pos>(), List<Placement>(), true));
+      return;
+    } else if ceilingClear and blockB.safe and blockC.physical {
+      // Up
+      if blockA.safe and d != 4 { // 4 blocks forward and 1 up is very difficult and fails often
+        if blockC.height - block0.height > 1.2 { return; } // Too high to jump
+        set cost = cost + float(self.entitiesNear(&blockB, 0, 0, 0)) * self.settings.entityCost;
+        neighbors.add(Move(blockB.x, blockB.y, blockB.z, node.remainingBlocks, cost, List<Pos>(), List<Placement>(), true));
+        return;
+      }
+    } else if (ceilingClear or d == 2) and blockB.safe and blockC.safe and blockD.safe and floorCleared {
+      // Down
+      blockE = self.near(node, dx, -2, dz);
+      if blockE.physical {
+        set cost = cost + float(self.entitiesNear(&blockD, 0, 0, 0)) * self.settings.entityCost;
+        neighbors.add(Move(blockD.x, blockD.y, blockD.z, node.remainingBlocks, cost, List<Pos>(), List<Placement>(), true));
+      }
+      set floorCleared = floorCleared and not blockE.physical;
+    } else if not blockB.safe or not blockC.safe {
+      return;
+    }
+
+    set ceilingClear = ceilingClear and blockA.safe;
+    set d = d + 1;
+  }
+}

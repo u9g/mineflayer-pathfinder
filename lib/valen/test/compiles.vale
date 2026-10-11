@@ -1,0 +1,5 @@
+// Builds every lib/valen source, to report the compiler's errors on all of them.
+
+exported func main() int {
+  return 0;
+}

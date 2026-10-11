@@ -1,6 +1,7 @@
 #!/bin/sh
 # Compiles the Valen sources in lib/valen, plus any extra .vale files, into a Wasm module.
 #   lib/valen/build.sh <out.wasm> <export,export,...> [extra.vale...]
+# VALEN_SOURCES limits the lib/valen sources to those files, for example "list.vale hashmap.vale".
 # With exports, it builds a WASI reactor exporting those funcs, whose extern funcs are imported
 # from "env"; with "-", a command that runs main.
 #
@@ -17,7 +18,11 @@ shift 2
 
 work=$(mktemp -d)
 mkdir "$work/src"
-cp "$here"/*.vale "$work/src/"
+if [ -n "${VALEN_SOURCES:-}" ]; then
+  for source in $VALEN_SOURCES; do cp "$here/$source" "$work/src/"; done
+else
+  cp "$here"/*.vale "$work/src/"
+fi
 for extra in "$@"; do cp "$extra" "$work/src/"; done
 
 flags=""
