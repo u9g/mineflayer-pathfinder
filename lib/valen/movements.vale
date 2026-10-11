@@ -288,6 +288,8 @@ func getMoveDiagonal(self &World mut, node &Move, dirX int, dirZ int, neighbors 
     if (not blockD.safe) { return void(); } // don't self-immolate
     set cost = cost + float(&self.entitiesNear(&blockC, 0, -1, 0)) * self.settings.entityCost;
     neighbors.add(Move(blockC.x, blockC.y - 1, blockC.z, node.remainingBlocks, cost, ^toBreak));
+  } else {
+    drop(^toBreak); // nowhere to land
   }
 }
 

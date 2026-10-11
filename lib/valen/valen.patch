@@ -15,7 +15,7 @@ index 7cbaf3d4..4e8054ad 100644
      globalState->getRegion(resultValueType)
          ->alias(FL(), functionState, builder, resultType, resultRef);
 diff --git a/Backend/src/function/expressions/externs.cpp b/Backend/src/function/expressions/externs.cpp
-index f8885afa..8a72cc4f 100644
+index f8885afa..28d84fc8 100644
 --- a/Backend/src/function/expressions/externs.cpp
 +++ b/Backend/src/function/expressions/externs.cpp
 @@ -182,6 +182,9 @@ Ref buildCallOrSideCall(
@@ -28,6 +28,391 @@ index f8885afa..8a72cc4f 100644
    assert(externFuncIter != globalState->externFunctions.end());
    auto externFuncL = externFuncIter->second;
  
+@@ -244,162 +247,165 @@ Ref buildExternCall(
+     LLVMBuilderRef builder,
+     Prototype* prototype,
+     const std::vector<Ref>& args) {
+-  if (prototype->name->name == "__vbi_addI32") {
++  // A builtin generic over a group, like __vbi_strLength<g'>, is named with its arguments
++  // (__vbi_strLength<Group>); match on the name without them.
++  auto builtinName = prototype->name->name.substr(0, prototype->name->name.find('<'));
++  if (builtinName == "__vbi_addI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildAdd(builder, leftLE, rightLE,"add");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_multiplyI32") {
++  } else if (builtinName == "__vbi_multiplyI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto resultIntLE = LLVMBuildMul(builder, leftLE, rightLE, "mul");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultIntLE);
+-  } else if (prototype->name->name == "__vbi_subtractI32") {
++  } else if (builtinName == "__vbi_subtractI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto resultIntLE = LLVMBuildSub(builder, leftLE, rightLE, "diff");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultIntLE);
+-  } else if (prototype->name->name == "__vbi_lessThanI32") {
++  } else if (builtinName == "__vbi_lessThanI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSLT, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_greaterThanI32") {
++  } else if (builtinName == "__vbi_greaterThanI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSGT, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_lessThanFloat") {
++  } else if (builtinName == "__vbi_lessThanFloat") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildFCmp(builder, LLVMRealOLT, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_greaterThanFloat") {
++  } else if (builtinName == "__vbi_greaterThanFloat") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildFCmp(builder, LLVMRealOGT, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_greaterThanOrEqI32") {
++  } else if (builtinName == "__vbi_greaterThanOrEqI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSGE, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_lessThanOrEqI32") {
++  } else if (builtinName == "__vbi_lessThanOrEqI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSLE, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_eqI32") {
++  } else if (builtinName == "__vbi_eqI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntEQ, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_modI32") {
++  } else if (builtinName == "__vbi_modI32") {
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     assert(args.size() == 2);
+     auto result = LLVMBuildSRem( builder, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_divideI32") {
++  } else if (builtinName == "__vbi_divideI32") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildSDiv(builder, leftLE, rightLE,"add");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_addI64") {
++  } else if (builtinName == "__vbi_addI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildAdd(builder, leftLE, rightLE,"add");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_multiplyI64") {
++  } else if (builtinName == "__vbi_multiplyI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto resultIntLE = LLVMBuildMul(builder, leftLE, rightLE, "mul");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultIntLE);
+-  } else if (prototype->name->name == "__vbi_subtractI64") {
++  } else if (builtinName == "__vbi_subtractI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto resultIntLE = LLVMBuildSub(builder, leftLE, rightLE, "diff");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultIntLE);
+-  } else if (prototype->name->name == "__vbi_lessThanI64") {
++  } else if (builtinName == "__vbi_lessThanI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSLT, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_greaterThanI64") {
++  } else if (builtinName == "__vbi_greaterThanI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSGT, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_greaterThanOrEqI64") {
++  } else if (builtinName == "__vbi_greaterThanOrEqI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSGE, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_lessThanOrEqI64") {
++  } else if (builtinName == "__vbi_lessThanOrEqI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntSLE, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_eqI64") {
++  } else if (builtinName == "__vbi_eqI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntEQ, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_modI64") {
++  } else if (builtinName == "__vbi_modI64") {
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     assert(args.size() == 2);
+     auto result = LLVMBuildSRem( builder, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_divideI64") {
++  } else if (builtinName == "__vbi_divideI64") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildSDiv(builder, leftLE, rightLE,"add");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_divideFloatFloat") {
++  } else if (builtinName == "__vbi_divideFloatFloat") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildFDiv(builder, leftLE, rightLE,"divided");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_multiplyFloatFloat") {
++  } else if (builtinName == "__vbi_multiplyFloatFloat") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildFMul(builder, leftLE, rightLE,"multiplied");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_subtractFloatFloat") {
++  } else if (builtinName == "__vbi_subtractFloatFloat") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildFSub(builder, leftLE, rightLE,"subtracted");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_negateFloat") {
++  } else if (builtinName == "__vbi_negateFloat") {
+     assert(args.size() == 1);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto result = LLVMBuildFNeg(builder, leftLE, "negated");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_strLength") {
++  } else if (builtinName == "__vbi_strLength") {
+     assert(args.size() == 1);
+ 
+     assert(dynamic_cast<ShareRef*>(prototype->params[0]) != nullptr);
+@@ -418,10 +424,10 @@ Ref buildExternCall(
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultLenLE);
+   }
+   // VCOORD: TEMPORARY: this whole section exists only until str is a proper Vale
+-  else if (prototype->name->name == "__vbi_addStr" ||
+-           prototype->name->name == "__vbi_streq" ||
+-           prototype->name->name == "__vbi_strcmp" ||
+-           prototype->name->name == "__vbi_strindexof") {
++  else if (builtinName == "__vbi_addStr" ||
++           builtinName == "__vbi_streq" ||
++           builtinName == "__vbi_strcmp" ||
++           builtinName == "__vbi_strindexof") {
+     // Signature: (a str, aBegin i32, aEnd i32, b str, bBegin i32, bEnd i32) -> str|bool|i32
+     assert(args.size() == 6);
+     auto strTypeA = globalState->metalCache->str;
+@@ -454,7 +460,7 @@ Ref buildExternCall(
+           globalState->getRegion(strTypeB)->dealias(FL(), functionState, builder, strTypeB, args[3]);
+           return resultRef;
+         };
+-    if (prototype->name->name == "__vbi_addStr") {
++    if (builtinName == "__vbi_addStr") {
+       auto totalLenLE = LLVMBuildAdd(builder, aLenLE, bLenLE, "totalLen");
+       auto strResultRef = globalState->getRegion(globalState->metalCache->str)
+           ->mallocStr(functionState, builder, totalLenLE, aStartLE);
+@@ -471,7 +477,7 @@ Ref buildExternCall(
+       auto bLenI64LE = LLVMBuildZExt(builder, bLenLE, LLVMInt64TypeInContext(globalState->context), "bLenI64");
+       buildCallWith64BitSExt(globalState, builder, globalState->externs->memcpy, {resultBOffsetLE, bStartLE, bLenI64LE});
+       return dealiasBothAndReturn(strResultRef);
+-    } else if (prototype->name->name == "__vbi_streq") {
++    } else if (builtinName == "__vbi_streq") {
+       // Return (aLen == bLen) && memcmp(aStart, bStart, aLen) == 0.
+       auto lenEqLE = LLVMBuildICmp(builder, LLVMIntEQ, aLenLE, bLenLE, "lenEq");
+       auto minLenLE = LLVMBuildSelect(builder,
+@@ -486,7 +492,7 @@ Ref buildExternCall(
+       auto eqLE = LLVMBuildAnd(builder, lenEqLE, cmpZeroLE, "eq");
+       return dealiasBothAndReturn(
+           toRef(globalState->getRegion(prototype->returnType), prototype->returnType, eqLE));
+-    } else if (prototype->name->name == "__vbi_strcmp") {
++    } else if (builtinName == "__vbi_strcmp") {
+       // Compare by memcmp up to min(aLen, bLen); if equal but lengths differ,
+       // shorter compares less.
+       auto minLenLE = LLVMBuildSelect(builder,
+@@ -501,7 +507,7 @@ Ref buildExternCall(
+       auto resultLE = LLVMBuildSelect(builder, cmpZeroLE, lenDiffLE, cmpLE, "cmpResult");
+       return dealiasBothAndReturn(
+           toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultLE));
+-    } else if (prototype->name->name == "__vbi_strindexof") {
++    } else if (builtinName == "__vbi_strindexof") {
+       auto findI64LE = buildCallWith64BitSExt(globalState, builder,
+           globalState->externs->valeRtBytesFindLF,
+           {aStartLE, aLenLE, bStartLE, bLenLE});
+@@ -513,7 +519,7 @@ Ref buildExternCall(
+       assert(false);
+       throw 1337;
+     }
+-  } else if (prototype->name->name == "__vbi_substring") {
++  } else if (builtinName == "__vbi_substring") {
+     // Signature: (s str, begin i32, end i32) -> str
+     assert(args.size() == 3);
+     auto strType = globalState->metalCache->str;
+@@ -540,7 +546,7 @@ Ref buildExternCall(
+ 
+     globalState->getRegion(strType)->dealias(FL(), functionState, builder, strType, args[0]);
+     return strResultRef;
+-  } else if (prototype->name->name == "__vbi_strtoascii") {
++  } else if (builtinName == "__vbi_strtoascii") {
+     // Signature: (s str, begin i32, end i32) -> i32
+     // Loads byte at s.chars[begin] and returns it zero-extended.
+     assert(args.size() == 3);
+@@ -558,7 +564,7 @@ Ref buildExternCall(
+ 
+     globalState->getRegion(strType)->dealias(FL(), functionState, builder, strType, args[0]);
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, byteI32LE);
+-  } else if (prototype->name->name == "__vbi_strfromascii") {
++  } else if (builtinName == "__vbi_strfromascii") {
+     // Signature: (code i32) -> str
+     // Builds a 1-char string from the given ASCII code.
+     assert(args.size() == 1);
+@@ -571,7 +577,7 @@ Ref buildExternCall(
+     return globalState->getRegion(globalState->metalCache->str)
+         ->mallocStr(functionState, builder,
+             LLVMConstInt(int32LT, 1, false), bufLE);
+-  } else if (prototype->name->name == "__vbi_printstr") {
++  } else if (builtinName == "__vbi_printstr") {
+     // Signature: (s str, start i32, length i32) -> void
+     assert(args.size() == 3);
+     auto strType = globalState->metalCache->str;
+@@ -586,7 +592,7 @@ Ref buildExternCall(
+     buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtWriteStdoutLF, {ptrLE, lengthLE});
+     globalState->getRegion(strType)->dealias(FL(), functionState, builder, strType, args[0]);
+     return makeVoidRef(globalState);
+-  } else if (prototype->name->name == "__vbi_getMainArg") {
++  } else if (builtinName == "__vbi_getMainArg") {
+     // Signature: (i int) -> str
+     assert(args.size() == 1);
+     auto int32LT = LLVMInt32TypeInContext(globalState->context);
+@@ -598,9 +604,9 @@ Ref buildExternCall(
+     auto bytesPtrLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtGetMainArgPtrLF, {iI64LE});
+     return globalState->getRegion(globalState->metalCache->str)
+         ->mallocStr(functionState, builder, lenI32LE, bytesPtrLE);
+-  } else if (prototype->name->name == "__vbi_castI32Str" ||
+-             prototype->name->name == "__vbi_castI64Str" ||
+-             prototype->name->name == "__vbi_castFloatStr") {
++  } else if (builtinName == "__vbi_castI32Str" ||
++             builtinName == "__vbi_castI64Str" ||
++             builtinName == "__vbi_castFloatStr") {
+     // Signature: (x <primitive>) -> str
+     // Format the primitive into a stack buffer via a C helper, then mallocStr.
+     assert(args.size() == 1);
+@@ -613,10 +619,10 @@ Ref buildExternCall(
+     auto bufSizeLE = LLVMConstInt(int32LT, bufSize, false);
+     auto xLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     LLVMValueRef writtenLE = nullptr;
+-    if (prototype->name->name == "__vbi_castI32Str") {
++    if (builtinName == "__vbi_castI32Str") {
+       auto xI64LE = LLVMBuildSExt(builder, xLE, LLVMInt64TypeInContext(globalState->context), "xI64");
+       writtenLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtI64ToAsciiLF, {xI64LE, bufPtrLE, bufSizeLE});
+-    } else if (prototype->name->name == "__vbi_castI64Str") {
++    } else if (builtinName == "__vbi_castI64Str") {
+       writtenLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtI64ToAsciiLF, {xLE, bufPtrLE, bufSizeLE});
+     } else {
+       writtenLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->valeRtFloatToAsciiLF, {xLE, bufPtrLE, bufSizeLE});
+@@ -624,59 +630,59 @@ Ref buildExternCall(
+     auto writtenI32LE = LLVMBuildTrunc(builder, writtenLE, int32LT, "writtenI32");
+     return globalState->getRegion(globalState->metalCache->str)
+         ->mallocStr(functionState, builder, writtenI32LE, bufPtrLE);
+-  } else if (prototype->name->name == "__vbi_addFloatFloat") {
++  } else if (builtinName == "__vbi_addFloatFloat") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildFAdd(builder, leftLE, rightLE, "add");
+     return toRef(globalState->getRegion(globalState->metalCache->floatType), globalState->metalCache->floatType, result);
+-  } else if (prototype->name->name == "__vbi_panic") {
++  } else if (builtinName == "__vbi_panic") {
+     buildPrintToStderr(globalState, builder, "(panic)\n");
+     // See MPESC for status codes
+     auto exitCodeLE = makeConstIntExpr(functionState, builder, LLVMInt64TypeInContext(globalState->context), 1);
+     buildCallWith64BitSExt(globalState, builder, globalState->externs->exit, {exitCodeLE});
+     LLVMBuildRet(builder, LLVMGetUndef(functionState->returnTypeL));
+     return toRef(globalState->getRegion(globalState->metalCache->neverType), globalState->metalCache->neverType, globalState->neverLE);
+-  } else if (prototype->name->name == "__vbi_getch") {
++  } else if (builtinName == "__vbi_getch") {
+     auto resultIntLE = buildCallWith64BitSExt(globalState, builder, globalState->externs->getch, {});
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, resultIntLE);
+-  } else if (prototype->name->name == "__vbi_eqFloatFloat") {
++  } else if (builtinName == "__vbi_eqFloatFloat") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildFCmp(builder, LLVMRealOEQ, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_eqBoolBool") {
++  } else if (builtinName == "__vbi_eqBoolBool") {
+     assert(args.size() == 2);
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     auto result = LLVMBuildICmp(builder, LLVMIntEQ, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_not") {
++  } else if (builtinName == "__vbi_not") {
+     assert(args.size() == 1);
+     auto result = LLVMBuildNot(
+         builder,
+         checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]),
+         "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_and") {
++  } else if (builtinName == "__vbi_and") {
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     assert(args.size() == 2);
+     auto result = LLVMBuildAnd( builder, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_or") {
++  } else if (builtinName == "__vbi_or") {
+     auto leftLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     auto rightLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[1], args[1]);
+     assert(args.size() == 2);
+     auto result = LLVMBuildOr( builder, leftLE, rightLE, "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_ExtendI32ToI64") {
++  } else if (builtinName == "__vbi_ExtendI32ToI64") {
+     auto intLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     assert(args.size() == 1);
+     auto result = LLVMBuildSExt(builder, intLE, LLVMInt64TypeInContext(globalState->context), "");
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, result);
+-  } else if (prototype->name->name == "__vbi_I64ToUSize") {
++  } else if (builtinName == "__vbi_I64ToUSize") {
+     auto intLE = checkValidInternalReference(FL(), globalState, functionState, builder, true, prototype->params[0], args[0]);
+     assert(args.size() == 1);
+     return toRef(globalState->getRegion(prototype->returnType), prototype->returnType, intLE);
 diff --git a/Backend/src/function/expressions/shared/elements.cpp b/Backend/src/function/expressions/shared/elements.cpp
 index 17ea6807..40835d3b 100644
 --- a/Backend/src/function/expressions/shared/elements.cpp
@@ -163,16 +548,14 @@ index e26e39f2..1172ec7c 100644
  
  PackageBuilderHandle* metal_package_builder_new(
 diff --git a/Backend/src/region/rcimm/rcimm.cpp b/Backend/src/region/rcimm/rcimm.cpp
-index 1c59587f..b1d0889f 100644
+index 1c59587f..2d70611c 100644
 --- a/Backend/src/region/rcimm/rcimm.cpp
 +++ b/Backend/src/region/rcimm/rcimm.cpp
-@@ -854,7 +854,8 @@ LLVMTypeRef RCImm::translateType(Kind* referenceM) {
+@@ -854,7 +854,6 @@ LLVMTypeRef RCImm::translateType(Kind* referenceM) {
      // return primitives.translatePrimitive(globalState, referenceM);
    } else {
      if (dynamic_cast<Str *>(valueType) != nullptr) {
 -      assert(dynamic_cast<ShareRef*>(referenceM) != nullptr);
-+      // Strings are single-owned now, so they come owned or borrowed as well as shared; all are a
-+      // pointer to the string's wrapper.
        return LLVMPointerType(kindStructs.getStringWrapperStruct(), 0);
      } else if (auto staticSizedArrayMT = dynamic_cast<StaticSizedArrayT *>(valueType)) {
        assert(dynamic_cast<ShareRef*>(referenceM) != nullptr);

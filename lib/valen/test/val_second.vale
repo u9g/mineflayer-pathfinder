@@ -1,0 +1,9 @@
+// The second element after pushing 7 and 9; exits with the value, which should be 9.
+// uses: none
+
+exported func main() int {
+  a = Array<int>(4);
+  a.push(7);
+  a.push(9);
+  return clone(a[1]);
+}

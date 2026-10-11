@@ -1,0 +1,9 @@
+// The length after two pushes; exits with the value, which should be 2.
+// uses: none
+
+exported func main() int {
+  a = Array<int>(4);
+  a.push(7);
+  a.push(9);
+  return a.len();
+}
