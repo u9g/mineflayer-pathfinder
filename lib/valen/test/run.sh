@@ -3,7 +3,8 @@
 #   <name>.vale alone: a program whose main returns 0, or the number of the failed check.
 #   <name>.vale with <name>.js: built as a reactor exporting the funcs listed on its
 #   "// exports:" line, then driven by node <name>.js <wasm>.
-# A "// uses:" line limits the lib/valen sources it's built with, as in "// uses: list.vale".
+# A "// uses:" line limits the lib/valen sources it's built with, as in "// uses: list.vale", and a
+# "// borrow-check: true" line builds it with the borrow checker.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
 out=$(mktemp -d)
@@ -11,7 +12,8 @@ failed=0
 for test in "$here"/*.vale; do
   name=$(basename "$test" .vale)
   VALEN_SOURCES=$(sed -n 's#^// uses: ##p' "$test")
-  export VALEN_SOURCES
+  VALEN_BORROW_CHECK=$(sed -n 's#^// borrow-check: ##p' "$test")
+  export VALEN_SOURCES VALEN_BORROW_CHECK
   echo "::group::$name"
   if [ -f "$here/$name.js" ]; then
     exports=$(sed -n 's#^// exports: ##p' "$test")

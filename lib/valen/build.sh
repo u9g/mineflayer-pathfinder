@@ -1,7 +1,8 @@
 #!/bin/sh
 # Compiles the Valen sources in lib/valen, plus any extra .vale files, into a Wasm module.
 #   lib/valen/build.sh <out.wasm> <export,export,...> [extra.vale...]
-# VALEN_SOURCES limits the lib/valen sources to those files, for example "list.vale hashmap.vale".
+# VALEN_SOURCES limits the lib/valen sources to those files, for example "list.vale hashmap.vale",
+# or "none". VALEN_BORROW_CHECK=true turns the borrow checker back on.
 # With exports, it builds a WASI reactor exporting those funcs, whose extern funcs are imported
 # from "env"; with "-", a command that runs main.
 #
@@ -19,7 +20,9 @@ shift 2
 work=$(mktemp -d)
 mkdir "$work/src"
 if [ -n "${VALEN_SOURCES:-}" ]; then
-  for source in $VALEN_SOURCES; do cp "$here/$source" "$work/src/"; done
+  for source in $VALEN_SOURCES; do
+    if [ "$source" != none ]; then cp "$here/$source" "$work/src/"; fi
+  done
 else
   cp "$here"/*.vale "$work/src/"
 fi
@@ -43,7 +46,7 @@ chmod +x "$work/clang"
 # Valen's own HashMap tests are built the same way.
 "$VALEN_DIR/target/debug/valec" build \
   --no-std \
-  --borrow-check false \
+  --borrow-check "${VALEN_BORROW_CHECK:-false}" \
   --builtins-dir-override "$VALEN_DIR/Backend/builtins" \
   --clang-override "$work/clang" \
   --target-triple wasm32-wasi \
