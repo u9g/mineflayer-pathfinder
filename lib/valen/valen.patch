@@ -1,13 +1,10 @@
 diff --git a/Backend/src/function/expressions/shared/elements.cpp b/Backend/src/function/expressions/shared/elements.cpp
-index 17ea6807..8aa7a026 100644
+index 17ea6807..40835d3b 100644
 --- a/Backend/src/function/expressions/shared/elements.cpp
 +++ b/Backend/src/function/expressions/shared/elements.cpp
-@@ -137,8 +137,9 @@ IncrementedSize incrementRSASize(
-     FunctionState* functionState,
+@@ -138,7 +138,6 @@ IncrementedSize incrementRSASize(
      LLVMBuilderRef builder,
      WrapperPtrLE rsaWPtrLE) {
-+  // A runtime-sized array always lives behind a pointer, never inline, so its size is always
-+  // in its wrapper.
    auto sizePtrLE = ::getRuntimeSizedArrayLengthPtr(globalState, builder, rsaWPtrLE);
 -  assert(false); // implement inline arrays
  
@@ -203,3 +200,20 @@ index 08fad758..dc3ba3e8 100644
    borrow_check: bool,
  
    #[arg(long, default_value_t = false)]
+diff --git a/src/typing/expression/expression_compiler.rs b/src/typing/expression/expression_compiler.rs
+index 7eabf939..ddf155fe 100644
+--- a/src/typing/expression/expression_compiler.rs
++++ b/src/typing/expression/expression_compiler.rs
+@@ -1224,6 +1224,12 @@ where
+           (KindT::Never(NeverT { from_break: true }), _) => uncoerced_else_block_2.result,
+           (_, KindT::Never(NeverT { from_break: true })) => uncoerced_then_block_2.result,
+           (a, b) if a == b => uncoerced_then_block_2.result,
++          // One side borrows a value the other has, like `x and s.flag` (lowered to
++          // `if x { s.flag } else { false }`): use the value, which convert copies the borrow into.
++          (KindT::BorrowRef(a_borrow), b)
++            if a_borrow.inner == b && self.kind_is_implicitly_cloneable(coutputs, b) => b,
++          (a, KindT::BorrowRef(b_borrow))
++            if b_borrow.inner == a && self.kind_is_implicitly_cloneable(coutputs, a) => a,
+           (a, b) => {
+             let a_citizen = ICitizenTT::try_from(a);
+             let b_citizen = ICitizenTT::try_from(b);
